@@ -1,0 +1,33 @@
+version: 1
+params:
+  slug:    {type: string, label: Mission slug, pattern: "^[a-z0-9][a-z0-9-]{2,38}$"}
+  title:   {type: string, label: Mission title}
+  brief:   {type: string, label: Spoken brief verbatim, multiline: true}
+  project: {type: string, label: Project key from desk.yaml or none, default: none}
+  bridge:  {type: bridge, default: [Mattermost, $first], input: advanced}
+room:
+  name: "mission-{slug}"
+  description: "RoomService mission: {title}"
+  bridge: "{bridge}"
+  channel_type: channel_public
+  instructions: "@@FILE:mission-room.md@@"
+  agents: [concierge, builder, scout, desk-laptop, life]
+  users: ["{$creator}"]
+  roles:
+    - name: hands
+      exclusive: true
+      instructions: "The body of the room: a program that executes the hands grammar on a real computer. Address @hands with one command per line."
+  docs:
+    - name: mission-brief
+      description: The mission as spoken, its slug and project.
+      instructions: Read first. Do not edit.
+      content: |
+        # {title}
+
+        **Spoken brief:** {brief}
+
+        **Mission slug:** {slug}
+        **Project key:** {project}
+kickoff: |
+  @desk-laptop mission {slug} {project}
+  @builder the brief is in this room's documents. Wait for the concierge's plan, then start.
