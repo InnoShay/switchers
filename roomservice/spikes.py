@@ -308,15 +308,54 @@ async def s7(settings: Settings, seconds: float = 180) -> None:
     await _watch_messages(settings, seconds)
 
 
+LEASE_PASS_S = 15.0  # SPEC §20.1 S8: backup must hold the role within 15 s
+
+
+class LapseMeter:
+    """Pure timing logic of S8: when did `hands` stop being held by the original holder?"""
+
+    def __init__(self) -> None:
+        self.holder: str | None = None  # who held hands before the kill
+        self.killed_at: float | None = None
+        self.lapsed_at: float | None = None
+        self.new_holder: str | None = None
+
+    def observe(self, t: float, holder: str | None) -> None:
+        if self.killed_at is None:
+            if holder:
+                self.holder = holder
+            return
+        if self.lapsed_at is None and holder != self.holder:
+            self.lapsed_at = t
+            self.new_holder = holder
+
+    def kill(self, t: float) -> None:
+        self.killed_at = t
+
+    @property
+    def lapse_s(self) -> float | None:
+        if self.killed_at is None or self.lapsed_at is None:
+            return None
+        return max(0.0, self.lapsed_at - self.killed_at)
+
+
+def recommend_mode(lapse_s: float | None) -> str:
+    """lease if the role moved within 15 s of the kill, else explicit (also if it never moved)."""
+    return "lease" if lapse_s is not None and lapse_s <= LEASE_PASS_S else "explicit"
+
+
 async def s8(settings: Settings, seconds: float = 120) -> None:
     """Lease lapse time: backup holds the role within 15 s of the laptop dying."""
+    from roomservice.agents.desk import hands_holder
+
     _steps("S8 lease lapse", [
-        "Run the laptop runtime holding `hands`, and this spike on the backup machine.",
-        "Kill the laptop runtime now.",
-        f"Printing every change of list_roles for {seconds:.0f}s (note the elapsed time).",
+        "Laptop runtime holds `hands` (a mission); `roomservice backup` runs on machine 2.",
+        "Run this spike as rs-spike (it will not steal a connection from either desk).",
+        "When prompted, kill the laptop runtime (Ctrl-C / close the lid), then press Enter.",
+        f"The spike then polls list_roles for up to {seconds:.0f}s and times the lapse.",
     ])  # fmt: skip
-    http, _, _ = _client(settings, settings.roomservice_agent, SPIKE_AGENT)
-    name, agent_id, key = _creds(settings, settings.roomservice_agent, SPIKE_AGENT)
+    http, _, _ = _client(settings, SPIKE_AGENT, settings.roomservice_agent)
+    name, agent_id, key = _creds(settings, SPIKE_AGENT, settings.roomservice_agent)
     try:
         room = _pick_room(await _list_rooms(http, settings))
         conn = RoomConnection(
@@ -324,22 +363,43 @@ async def s8(settings: Settings, seconds: float = 120) -> None:
             room=room, on_event=_noop, bus=Bus(),
         )  # fmt: skip
         conn.start()
+        meter = LapseMeter()
+        loop = asyncio.get_running_loop()
+        prompt: asyncio.Future | None = None
         t0 = time.monotonic()
-        last = None
-        while time.monotonic() - t0 < seconds:
+        while time.monotonic() - t0 < seconds + 60:
             await asyncio.sleep(1)
             if not conn.connected:
                 continue
             try:
-                roles = await http.op("list_roles", {}, conn.connection_id)
+                holder = hands_holder(await http.op("list_roles", {}, conn.connection_id))
             except OpError as e:
                 _info(f"list_roles: {e}")
                 continue
-            snap = json.dumps(roles, sort_keys=True)
-            if snap != last:
-                last = snap
-                console.print(f"t+{time.monotonic() - t0:5.1f}s roles: {snap[:300]}")
+            now = time.monotonic()
+            meter.observe(now, holder)
+            if meter.killed_at is None and meter.holder and prompt is None:
+                console.print(f"hands is held by [bold]{meter.holder}[/bold].")
+                console.print("Kill the laptop runtime NOW, then press Enter ...")
+                prompt = loop.run_in_executor(None, input)
+            if prompt is not None and prompt.done() and meter.killed_at is None:
+                meter.kill(now)
+                t0 = now  # the watch window starts at the kill
+            if meter.lapse_s is not None:
+                break
+            if meter.killed_at is not None and now - meter.killed_at > seconds:
+                break
         await conn.stop()
+        lapse = meter.lapse_s
+        if lapse is None:
+            console.print("[red]FAIL[/red] hands never left its holder in the window.")
+        else:
+            verdict = "[green]PASS[/green]" if lapse <= LEASE_PASS_S else "[yellow]SLOW[/yellow]"
+            console.print(
+                f"{verdict} hands moved to {meter.new_holder or 'nobody'} after {lapse:.1f}s"
+            )
+        console.print(f"Recommended ROOMSERVICE_HANDOFF_MODE={recommend_mode(lapse)}")
+        console.print("Record it in DECISIONS.md: `RS-12: S8 lapse <n>s — mode <mode>`")
     finally:
         await http.aclose()
 

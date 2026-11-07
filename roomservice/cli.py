@@ -316,6 +316,17 @@ def up(
 
 
 @app.command()
+def backup(dry_run: bool = typer.Option(False, "--dry-run", help="Fake OS actions")) -> None:
+    """Run the backup desk (desk-backup, no life/scheduler); takes `hands` on handoff (SPEC §15)."""
+    from roomservice.agents.backup import run_backup
+
+    try:
+        asyncio.run(run_backup(dry_run))
+    except KeyboardInterrupt:
+        console.print("bye")
+
+
+@app.command()
 def say(text: str = typer.Argument(..., help="Text to speak")) -> None:
     """Local TTS test with the configured voice."""
     from roomservice.contracts.config import Voice, load_desk_config

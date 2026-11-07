@@ -483,7 +483,9 @@ class DeskActions:
             raise Refuse("unknown project")
         ok, holder = await self.roles.assume_hands(ctx.room)
         if not ok:
-            raise Refuse(f"hands is held by {holder or 'someone else'}")
+            who = holder or "someone else"
+            return ActionResult(False, reason=f"hands is held by {who}",
+                                text=receipts.refused_held(who))  # fmt: skip
         p = self.cfg.projects[project] if project else None
         auto = self.state.start_mission(
             slug, project or None, p.path if p else None, p.screenshot_url if p else None

@@ -69,12 +69,17 @@ class FakeSwitch:
         ping_every: float = 0.2,
         generation: int = 7,
         rooms: list[dict] | None = None,
+        lease_ttl: float | None = None,
     ) -> None:
         self.scripts = scripts or []
         self.ping_every = ping_every
         self.generation = generation
         self.rooms = rooms if rooms is not None else [{"id": "room-1", "name": "roomservice-hq"}]
         self.agents: dict[str, dict] = {}
+        # Role state (assume/release/list_roles): role -> {"agent_id", "name", "renewed"}.
+        # With `lease_ttl`, a holder that stopped renewing for that long loses the role.
+        self.roles: dict[str, dict] = {}
+        self.lease_ttl = lease_ttl
         self.calls: list[dict] = []  # every HTTP/WS interaction, in order
         self.ws_opens: list[dict] = []  # query params + headers of each WebSocket open
         self.pongs: list[dict] = []  # {"cursor", "latency", "t"}
@@ -89,6 +94,20 @@ class FakeSwitch:
         rec = {"name": name, "t": time.monotonic(), **kw}
         self.calls.append(rec)
         return rec
+
+    def _holder(self, role: str) -> dict | None:
+        cur = self.roles.get(role)
+        if (
+            cur
+            and self.lease_ttl is not None
+            and time.monotonic() - cur["renewed"] > self.lease_ttl
+        ):
+            del self.roles[role]  # lease lapsed
+            return None
+        return cur
+
+    def _agent_name(self, agent_id: str) -> str:
+        return next((n for n, a in self.agents.items() if a["id"] == agent_id), agent_id)
 
     def calls_named(self, name: str) -> list[dict]:
         return [c for c in self.calls if c["name"] == name]
@@ -164,7 +183,25 @@ class FakeSwitch:
             if op_name == "read_context":
                 return {"result": {"messages": []}}
             if op_name == "list_roles":
-                return {"result": []}
+                held = [(r, fake._holder(r)) for r in list(fake.roles)]
+                return {"result": [{"name": r, "holder": h["name"]} for r, h in held if h]}
+            if op_name == "assume_role":
+                role = args["role"]
+                cur = fake._holder(role)
+                if cur and cur["agent_id"] != agent_id:
+                    return JSONResponse(
+                        {"detail": f"role {role} is held by {cur['name']}"}, status_code=409
+                    )
+                fake.roles[role] = {
+                    "agent_id": agent_id,
+                    "name": fake._agent_name(agent_id),
+                    "renewed": time.monotonic(),
+                }
+                return {"result": {"ok": True}}
+            if op_name == "release_role":
+                for r in [r for r, h in fake.roles.items() if h["agent_id"] == agent_id]:
+                    del fake.roles[r]
+                return {"result": {"ok": True}}
             return {"result": {"ok": True}}
 
         @app.post("/agents/{agent_id}/message")
@@ -202,7 +239,14 @@ class FakeSwitch:
 
         @app.post("/agents/{agent_id}/leases/renew")
         async def lease(agent_id: str, request: Request):
-            fake._rec("lease_renew", conn_id=request.headers.get("x-switch-connection-id"))
+            fake._rec(
+                "lease_renew",
+                agent_id=agent_id,
+                conn_id=request.headers.get("x-switch-connection-id"),
+            )
+            for h in fake.roles.values():
+                if h["agent_id"] == agent_id:
+                    h["renewed"] = time.monotonic()
             return {"ok": True}
 
         @app.websocket("/agents/{agent_id}/connection/ws")
