@@ -32,6 +32,8 @@ def bodies(fake):
 async def _setup(monkeypatch, script):
     fake = await FakeSwitch([script]).start()
     monkeypatch.setenv("SWITCH_URL", fake.url)
+    monkeypatch.setenv("N8N_LIFE_URL", N8N)
+    monkeypatch.setenv("N8N_LIFE_TOKEN", "change-me")  # never read the developer's real .env
     store.save_agent_creds(fake.url, "life", "id-life", "key-life")
     bus = Bus()
     agent = LifeAgent(settings=Settings(), bus=bus, mission_slug=lambda: "volt-waitlist")

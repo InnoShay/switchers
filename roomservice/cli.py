@@ -335,6 +335,23 @@ def backup(dry_run: bool = typer.Option(False, "--dry-run", help="Fake OS action
 
 
 @app.command()
+def hud(
+    demo: bool = typer.Option(False, "--demo", help="Loop a scripted 90 s story of every event"),
+    port: int = typer.Option(0, "--port", help="Port (default: HUD_PORT)"),
+) -> None:
+    """Run Mission Control alone (RS-08). With --demo it needs no Switch."""
+    from roomservice.hud.demo import run_demo
+    from roomservice.hud.server import run_hud
+
+    port = port or load_settings().hud_port
+    console.print(f"HUD on http://127.0.0.1:{port}  (Ctrl+C to stop)")
+    try:
+        asyncio.run(run_demo(port) if demo else run_hud(port))
+    except KeyboardInterrupt:
+        console.print("bye")
+
+
+@app.command()
 def say(text: str = typer.Argument(..., help="Text to speak")) -> None:
     """Local TTS test with the configured voice."""
     from roomservice.contracts.config import Voice, load_desk_config
