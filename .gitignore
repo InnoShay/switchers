@@ -1,0 +1,24 @@
+# secrets
+.env
+infra/.env
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# node (demo/volt)
+node_modules/
+
+# images: only docs/ and tests/fixtures/ may carry PNGs
+*.png
+!docs/**/*.png
+!tests/fixtures/**/*.png
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
