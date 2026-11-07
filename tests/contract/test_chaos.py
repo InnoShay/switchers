@@ -84,7 +84,7 @@ async def _restart_scenario(rig, outage_s: float):
     )
     agent, adapter = await make_desk(first)
     await wait_for(lambda: any(b.startswith("✅ status") for b in bodies(first)))
-    assert count(adapter, "open_app") == 1
+    await wait_for(lambda: count(adapter, "open_app") == 1)
 
     await first.stop()  # Switch down / Wi-Fi off
     await asyncio.sleep(outage_s)
@@ -103,7 +103,7 @@ async def _restart_scenario(rig, outage_s: float):
     assert reopen["connection_id"] == first.ws_opens[0]["query"]["connection_id"]
     # no duplicate execution
     assert count(adapter, "open_app") == 2  # browser (before) + notes (after), each exactly once
-    assert count(adapter, "open_app", "Google Chrome") == 1
+    assert count(adapter, "open_app", agent.actions.app_target("browser")) == 1
     assert len([b for b in bodies(first) + bodies(second) if b.startswith("✅ status")]) == 1
     assert len([b for b in bodies(second) if b.startswith("✅ open notes")]) == 1
     return agent
