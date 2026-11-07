@@ -117,8 +117,12 @@ def command_lines(body: str, addressed: bool) -> list[str]:
     if found or not addressed:
         return found
     # Addressed with no matching line: whole body minus every @token is one command.
+    # RS-07: only when its first word is a known verb or alias; anything else is prose.
     fallback = " ".join(_MENTION_TOKEN_RE.sub(" ", body).split())
-    return [fallback]
+    first = fallback.split(" ", 1)[0].lower()
+    if ALIASES.get(first, first) in VERBS:
+        return [fallback]
+    return []
 
 
 def parse_message(
@@ -127,13 +131,11 @@ def parse_message(
     """Parse a chat message into at most `max_commands` items.
 
     Extra commands are dropped and `refusal` carries the exact §12.2 text.
-    An addressed message that is empty after stripping yields one ParseError.
+    Prose (no mention line, no leading verb) yields nothing: ignored silently.
     """
     cmds = command_lines(body, addressed)
     out = ParsedMessage()
     if not cmds:
-        if addressed:
-            out.items.append(ParseError(body.strip(), "empty command"))
         return out
     if len(cmds) > max_commands:
         out.refusal = too_many_commands_text(max_commands)
