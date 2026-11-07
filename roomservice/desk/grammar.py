@@ -56,6 +56,8 @@ VERBS: frozenset[str] = frozenset(
         "freeze",
         "unfreeze",
         "help",
+        "exec",
+        "projects",
     }
 )
 
