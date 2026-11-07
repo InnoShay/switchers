@@ -6,15 +6,15 @@ Every prompt, room instruction, PR description and doc dictated with Wispr Flow.
 
 | time IST | who | where | what (≤ 12 words) |
 |---|---|---|---|
-| --:-- | Yash | Telegram HQ | Room service. Tonight we ship the Volt waitlist page. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Block nine to eleven and remind me at eleven. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Show me. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Make the join button orange and bigger, add confetti. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | ok K7Q3 (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Wrap up. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Room service, resume Volt. (example, replace with real Wispr dictation) |
-| --:-- | Yash | Telegram HQ | Block nine to eleven tonight for this and remind me at eleven. (example, replace with real Wispr dictation) |
-| --:-- | Lakshay | Mattermost mission room | @hands status (example, replace with real Wispr dictation) |
-| --:-- | Lakshay | Mattermost mission room | @hands open Steam (example, replace with real Wispr dictation) |
-| --:-- | Lakshay | Mattermost mission room | @hands release (example, replace with real Wispr dictation) |
-| --:-- | Lakshay | Telegram HQ | Room service boot volt. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Room service. Tonight we ship the Volt waitlist page. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Block nine to eleven and remind me at eleven. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Show me. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Make the join button orange and bigger, add confetti. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | ok K7Q3 (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Wrap up. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Room service, resume Volt. (example, replace with real Wispr dictation) |
+| --:-- | Yash | Telegram main chat | Block nine to eleven tonight for this and remind me at eleven. (example, replace with real Wispr dictation) |
+| --:-- | Lakshay | Mattermost task room | @computer status (example, replace with real Wispr dictation) |
+| --:-- | Lakshay | Mattermost task room | @computer open Steam (example, replace with real Wispr dictation) |
+| --:-- | Lakshay | Mattermost task room | @computer release (example, replace with real Wispr dictation) |
+| --:-- | Lakshay | Telegram main chat | Room service boot volt. (example, replace with real Wispr dictation) |

@@ -25,11 +25,11 @@ Our version of the idea fits in one picture.
 
 1. **Run a server and check it:** `curl $SWITCH_URL/health` should return `200`. Create a registration key in the Gateway.
 2. **Register your own agents first** (`uv run roomservice register`). Templates name agents, and Switch refuses a template that names one that does not exist yet.
-3. **Import the crew template.** It creates `concierge`, `builder`, `scout` and the room `roomservice-hq`.
+3. **Import the crew template.** It creates the Planner (`concierge`), Builder, Researcher (`scout`) and the main chat room `roomservice-hq`.
 4. **Connect Telegram.** One BotFather bot, Group Privacy off before you add it anywhere. Bots cannot create groups, so you create the group and add the bot.
 5. **Pair yourself.** The desk only trusts participant ids it captured during pairing.
 
-[SCREENSHOT: the Telegram group with the crew introduced]
+[SCREENSHOT: the Telegram group with the team introduced]
 
 ## A protocol agent is a WebSocket and a promise to answer pings
 
@@ -54,23 +54,23 @@ async for raw in ws:
             await handle(data["room_id"], data["payload"]["body"])
 ```
 
-Our real client adds reconnect with backoff, a stored cursor and a rule about which refusals are fatal, but the loop above is most of it. Our desk and our `life` bridge are this loop with different handlers.
+Our real client adds reconnect with backoff, a stored cursor and a rule about which refusals are fatal, but the loop above is most of it. Our Computer and our Assistant (`life`) bridge are this loop with different handlers.
 
-## The hands are a program, not a model
+## The Computer is a program, not a model
 
-The desk understands a tiny grammar, one command per line: `boot`, `mission`, `open`, `url`, `run`, `shot`, `say`, `close`, `commit`, `push`, `wrap`, `resume` and a few more. It has no shell. Apps, URL patterns and scripts come from an allowlist in `config/desk.yaml`, and commands reach the operating system as argument lists, never through a shell string. `@hands open Steam` answers `⛔ refused · open Steam — not on the allowlist`.
+The Computer understands a tiny grammar, one command per line: `boot`, `task`, `open`, `url`, `run`, `shot`, `say`, `close`, `commit`, `push`, `wrap`, `resume` and a few more. It has no shell. Apps, URL patterns and scripts come from an allowlist in `config/desk.yaml`, and commands reach the operating system as argument lists, never through a shell string. `@computer open Steam` answers `⛔ refused · open Steam — not on the allowlist`.
 
-This is the part we trust Switch for. Addressing rules mean someone else in the room is refused before the desk even sees the message. Approvals (`commit`, `push`, `close all`) resolve only from the participant ids captured at pairing, so an agent cannot approve its own risky step and a display name proves nothing.
+This is the part we trust Switch for. Addressing rules mean someone else in the room is refused before the Computer even sees the message. Approvals (`commit`, `push`, `close all`) resolve only from the participant ids captured at pairing, so an agent cannot approve its own risky step and a display name proves nothing.
 
 ## Templates run by agents
 
-When you say "Room service, tonight we ship the Volt waitlist page", two things happen at once. The desk hears the wake phrase from the paired owner and ignites: lights, voice, editor, dev server, browser, focus mode. That is plain code and it does not wait for any model. Meanwhile `concierge` reads the same message and calls `run_template` with our mission template, which creates `mission-volt-waitlist` with the crew, a `mission-brief` document and a kickoff message that wakes the desk and the builder. The template is why every mission has the same shape.
+When you say "Room service, tonight we ship the Volt waitlist page", two things happen at once. The Computer hears the wake phrase from the paired owner and wakes up: lights, voice, editor, dev server, browser, focus mode. That is plain code and it does not wait for any model. Meanwhile the Planner (`concierge`) reads the same message and calls `run_template` with our task template, which creates `task-volt-waitlist` with the team, a `task-brief` document and a kickoff message that wakes the Computer and the Builder. The template is why every task has the same shape.
 
-[SCREENSHOT: Mattermost mission room right after creation]
+[SCREENSHOT: Mattermost task room right after creation]
 
 ## Roles and handoff
 
-The `hands` role is exclusive: one holder at a time, and an agent holds one role across all rooms. The desk takes it when a mission starts and renews its lease every 3 seconds. A second machine runs `roomservice backup`, which polls the newest mission room and takes the role when it is free. Close the lid, and the HUD on the other laptop flashes HANDS TRANSFERRED. We built an explicit fallback (`@hands release` before closing the lid) in case the lease takes too long to lapse; the measured lapse time is in `DECISIONS.md` once spike S8 has been run on the real server (measure).
+The `hands` role is exclusive: one holder at a time, and an agent holds one role across all rooms. The Computer takes it when a task starts and renews its lease every 3 seconds. A second machine runs `roomservice backup`, which polls the newest task room and takes the role when it is free. Close the lid, and the HUD on the other laptop flashes COMPUTER TRANSFERRED. We built an explicit fallback (`@computer release` before closing the lid) in case the lease takes too long to lapse; the measured lapse time is in `DECISIONS.md` once spike S8 has been run on the real server (measure).
 
 ## Five gotchas we actually hit
 
@@ -85,7 +85,7 @@ Two honest caveats: the builder's permission prompts are detected by a literal p
 
 ## What we would do next
 
-Let the room follow you between machines, let a friend's desk join your mission room, and keep a store of mission templates. Remove Switch from this project and the room has no body, no memory and no leash.
+Let the room follow you between machines, let a friend's computer join your task room, and keep a store of task templates. Remove Switch from this project and the room has no body, no memory and no leash.
 
 ## Links
 
