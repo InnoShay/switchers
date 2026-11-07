@@ -1,33 +1,39 @@
 version: 1
 params:
-  slug:    {type: string, label: Mission slug, pattern: "^[a-z0-9][a-z0-9-]{2,38}$"}
-  title:   {type: string, label: Mission title}
+  slug:    {type: string, label: Task slug, pattern: "^[a-z0-9][a-z0-9-]{2,38}$"}
+  title:   {type: string, label: Task title}
   brief:   {type: string, label: Spoken brief verbatim, multiline: true}
   project: {type: string, label: Project key from desk.yaml or none, default: none}
   bridge:  {type: bridge, default: [Mattermost, $first], input: advanced}
 room:
-  name: "mission-{slug}"
-  description: "RoomService mission: {title}"
+  name: "task-{slug}"
+  description: "RoomService task: {title}"
   bridge: "{bridge}"
   channel_type: channel_public
   instructions: "@@FILE:mission-room.md@@"
   agents: [concierge, builder, scout, desk-laptop, life]
   users: ["{$creator}"]
+  aliases:
+    planner: concierge
+    researcher: scout
+    computer: desk-laptop
+    assistant: life
+    backup: desk-backup
   roles:
     - name: hands
       exclusive: true
-      instructions: "The body of the room: a program that executes the hands grammar on a real computer. Address @hands with one command per line."
+      instructions: "The body of the room (the Computer): a program that executes the Computer grammar on a real computer. Address @computer (or @hands) with one command per line."
   docs:
-    - name: mission-brief
-      description: The mission as spoken, its slug and project.
+    - name: task-brief
+      description: The task as spoken, its slug and project.
       instructions: Read first. Do not edit.
       content: |
         # {title}
 
         **Spoken brief:** {brief}
 
-        **Mission slug:** {slug}
+        **Task slug:** {slug}
         **Project key:** {project}
 kickoff: |
-  @desk-laptop mission {slug} {project}
-  @builder the brief is in this room's documents. Wait for the concierge's plan, then start.
+  @desk-laptop task {slug} {project}
+  @builder the brief is in this room's documents. Wait for the Planner's plan, then start.

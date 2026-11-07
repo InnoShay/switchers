@@ -6,8 +6,8 @@ params:
   bridge:    {type: bridge, default: [Mattermost, $first], input: advanced}
 agents:
   - name: concierge
-    display_name: Concierge
-    description: Turns one spoken sentence into a mission room, a crew and a plan.
+    display_name: Planner
+    description: Turns one spoken sentence into a task room, a team and a plan.
     provider: "{provider}"
     location: "{location}"
     directory: "{workspace}/concierge"
@@ -16,7 +16,7 @@ agents:
     instructions: "@@FILE:concierge.md@@"
   - name: builder
     display_name: Builder
-    description: Builds the mission's project and asks hands for proof.
+    description: Builds the task's project and asks the Computer for proof.
     provider: "{provider}"
     location: "{location}"
     directory: "{workspace}"
@@ -24,8 +24,8 @@ agents:
     auto_mode: true
     instructions: "@@FILE:builder.md@@"
   - name: scout
-    display_name: Scout
-    description: Finds references and registers them in the mission room.
+    display_name: Researcher
+    description: Finds references and registers them in the task room.
     provider: "{provider}"
     location: "{location}"
     directory: "{workspace}/scout"
@@ -34,10 +34,16 @@ agents:
     instructions: "@@FILE:scout.md@@"
 room:
   name: roomservice-hq
-  description: RoomService headquarters. Speak a mission here.
+  description: RoomService main chat. Speak a task here.
   bridge: "{bridge}"
   channel_type: channel_public
   instructions: "@@FILE:hq-room.md@@"
   agents: [concierge, builder, scout, desk-laptop, life]
   users: ["{$creator}"]
-kickoff: "@concierge introduce the crew in three short lines and say you're ready for a mission."
+  aliases:
+    planner: concierge
+    researcher: scout
+    computer: desk-laptop
+    assistant: life
+    backup: desk-backup
+kickoff: "@concierge introduce the team in three short lines and say you're ready for a task."
