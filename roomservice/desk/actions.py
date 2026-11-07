@@ -782,20 +782,32 @@ class DeskActions:
         m = self.state.active
         proj = self.current_project()
         up_min = int((self.clock() - self.started) / 60)
-        bits = [
-            f"task {m.slug}" if m else "no task",
-            f"project {proj[0]} ({proj[1].path})" if proj else "no project",
+        home = str(Path.home())
+
+        def short(path: object) -> str:
+            text = str(path)
+            return "~" + text[len(home) :] if text.startswith(home) else text
+
+        on_job = self.runtime.role_held()
+        apps = ", ".join(self.opened["apps"]) or "none"
+        lines = [
+            "✅ status",
+            "",
+            f"📌 Task: {m.slug}" if m else "📌 Task: none",
+            f"📁 Project: {proj[0]}" if proj else "📁 Project: none",
         ]
-        if proj and proj[1].screenshot_url:
-            bits.append(f"dev {proj[1].screenshot_url}")
-        bits += [
-            "apps: " + (", ".join(self.opened["apps"]) or "none"),
-            f"up {up_min}m",
-            f"queue {self.runtime.queue_len()}",
-            f"paused {'yes' if self.runtime.frozen else 'no'}",
-            f"computer on the job: {'yes' if self.runtime.role_held() else 'no'}",
+        if proj:
+            lines.append(f"    {short(proj[1].path)}")
+            if proj[1].screenshot_url:
+                lines.append(f"🌐 Site: {proj[1].screenshot_url}")
+        lines += [
+            f"🖥 Computer: {'on the job' if on_job else 'standing by'}",
+            f"⏸ Paused: {'yes' if self.runtime.frozen else 'no'}",
+            f"📋 Queue: {self.runtime.queue_len()} waiting",
+            f"🧩 Apps opened: {apps}",
+            f"⏱ Running for {up_min} min",
         ]
-        return ActionResult(True, summary=" · ".join(bits))
+        return ActionResult(True, text="\n".join(lines))
 
     # -- screenshots --------------------------------------------------------------------
 

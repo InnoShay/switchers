@@ -4,7 +4,7 @@ Start everything: `bash scripts/demo_up.sh`. The Control Room opens at <http://1
 
 | # | Say | What you should see |
 |---|---|---|
-| 1 | `@computer status` | `✅ status · …` with the task, project folder, dev server and whether the computer is on the job |
+| 1 | `@computer status` | a short list: task, project folder, site address, whether the computer is on the job, pause state, queue, apps opened |
 | 2 | `Room service, tonight we ship the Volt waitlist page` | Wake-up in the Control Room, a spoken greeting, VS Code and the dev server open, a task room and a plan from the Planner |
 | 3 | `show me` | A screenshot of the running page in the chat within about 15 seconds |
 | 4 | `make the join button orange and bigger` | The Builder edits `demo/volt` (copy at `~/roomservice-workspace/projects/volt`); ask `show me` again to see it |
