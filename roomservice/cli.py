@@ -230,7 +230,7 @@ def _status_table(agent) -> None:
     console.print(t)
 
 
-async def _up(dry_run: bool, no_hud: bool, no_life: bool) -> None:
+async def _up(dry_run: bool, no_hud: bool, no_life: bool, fire: str | None = None) -> None:
     import contextlib
 
     from roomservice.agents.desk import DeskAgent
@@ -262,6 +262,7 @@ async def _up(dry_run: bool, no_hud: bool, no_life: bool) -> None:
     if hud_started:
         _open_hud(settings.hud_port)
 
+    life = None
     if not no_life:
         life_cls = _optional("roomservice.agents.life", "LifeAgent")
         if life_cls is not None:
@@ -275,12 +276,18 @@ async def _up(dry_run: bool, no_hud: bool, no_life: bool) -> None:
         if start_sched is not None:
             try:
                 scheduler = _call_flexible(
-                    start_sched, settings=settings, cfg=cfg, desk=agent, agent=agent
+                    start_sched, settings=settings, cfg=cfg, desk=agent, agent=agent, life=life
                 )
                 if asyncio.iscoroutine(scheduler):
                     scheduler = await scheduler
             except Exception as e:
                 console.print(f"[yellow]scheduler skipped: {e}[/yellow]")
+        if fire and scheduler is not None:
+            job = scheduler.get_job(fire)
+            if job is None:
+                console.print(f"[yellow]--fire: no job '{fire}'[/yellow]")
+            else:
+                await job.func(*job.args)
 
     try:
         while True:
@@ -302,10 +309,11 @@ def up(
     dry_run: bool = typer.Option(False, "--dry-run", help="Fake OS actions (no real apps/speech)"),
     no_hud: bool = typer.Option(False, "--no-hud", help="Do not start the HUD"),
     no_life: bool = typer.Option(False, "--no-life", help="Do not start life/scheduler"),
+    fire: str | None = typer.Option(None, "--fire", help="Run a job now (morning-brief)"),
 ) -> None:
     """Start the desk (hands), plus HUD/life/scheduler when they exist."""
     try:
-        asyncio.run(_up(dry_run, no_hud, no_life))
+        asyncio.run(_up(dry_run, no_hud, no_life, fire))
     except KeyboardInterrupt:
         console.print("bye")
     except (SystemExit, typer.Exit):
