@@ -11,6 +11,13 @@ RS-01: Bus gained `set_connection()` and `set_machine()` helpers (additive) — 
 RS-01: MessageEvent.body is truncated to 400 chars (with "…") rather than rejected — a long chat message must never crash a publisher.
 RS-01: CODEOWNERS handles: Lakshay = @InnoShay (gh api user), Yash = @yash-144 (confirmed by Lakshay).
 RS-01: ruff format excludes *.md — newer ruff reformats the Python code blocks inside SPEC.md, which must stay byte-identical.
+RS-03: list_rooms result parsed tolerantly (list, or dict wrapping `rooms`; ids from `id`/`room_id`) — Appendix A gives no response shape; confirm with S2/S3 on the real server.
+RS-03: RoomConnection also skips frames with id <= last enqueued id (not only <= cursor) — cursor advances after the handler, so a resume could otherwise re-enqueue an in-flight event.
+RS-03: connection_state only seeds the cursor when none is stored — overwriting it could skip events still queued.
+RS-03: connect_to_room runs right after the first connection_state frame, off the receive task — keeps pongs immediate; handler waits for it so self-id is known.
+RS-03: `refused` with 4xx (except 408/429) and close code 4400 are fatal for that room; other refusals reconnect with backoff — spec only says "log; close".
+RS-03: paired-owner ids are read from every "sender" key in owners.json — RS-07 owns the file format; this only feeds the HUD `you` label.
+RS-03: added python-multipart to the dev dependency group — FastAPI form/file parsing in tests/contract/fake_switch.py.
 RS-05: grammar returns a ParsedMessage (items + refusal) and reports unknown verbs as ParseError — the spec only gives Command/ParseError; extras beyond 5 are dropped with the exact refusal text so the first 5 still run.
 RS-05: "show me" parses to `shot` with the trailing "me" dropped — `show` is an alias of `shot` and the golden path says "show me".
 RS-05: allowlist denial reason is `not on the allowlist` (A13 text is `⛔ refused · <raw> — <reason>`); disallowed URLs say `url not allowed (https or localhost only)`; alias URLs from desk.yaml also pass the URL pattern rule.

@@ -29,6 +29,7 @@ roomservice = "roomservice.cli:app"
 dev = [
     "pytest",
     "pytest-asyncio",
+    "python-multipart",
     "respx",
     "freezegun",
     "ruff",
