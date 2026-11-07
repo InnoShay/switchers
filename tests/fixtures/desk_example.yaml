@@ -1,0 +1,37 @@
+version: 1
+machine_name: laptop
+timezone: Asia/Kolkata
+voice: {enabled: true, voice_name: Samantha, rate: 190}
+ignition:
+  wake_phrases: ["room service", "roomservice", "room servis", "rumservice", "room sarvis"]
+  default_profile: focus-session
+apps:
+  editor:   {mac: "Visual Studio Code", win: "code", linux: "code"}
+  browser:  {mac: "Google Chrome", win: "chrome", linux: "google-chrome"}
+  music:    {mac: "Spotify", win: "spotify", linux: "spotify"}
+  notes:    {mac: "Notes", win: "notepad", linux: "gedit"}
+  terminal: {mac: "Terminal", win: "wt", linux: "x-terminal-emulator"}
+urls:
+  github: https://github.com
+  calendar: https://calendar.google.com
+  mail: https://mail.google.com
+scripts:
+  test:   {cmd: ["npm", "test"], cwd: project, confirm: false, timeout_s: 120}
+  build:  {cmd: ["npm", "run", "build"], cwd: project, confirm: false, timeout_s: 180}
+  deploy: {cmd: ["npx", "vercel", "--prod", "--yes"], cwd: project, confirm: true, timeout_s: 300}
+projects:
+  volt:
+    keywords: ["volt", "waitlist"]
+    path: ~/roomservice-workspace/projects/volt
+    open_editor: true
+    terminals: [{name: dev, cmd: "npm run dev -- --port 5173 --strictPort"}]
+    urls: ["http://localhost:5173", github]
+    wait_for: http://localhost:5173
+    screenshot_url: http://localhost:5173
+    focus: true
+    music: "spotify:playlist:37i9dQZF1DX5trt9i14X7j"
+    lights: true
+profiles:
+  focus-session: {apps: [notes], urls: [calendar], focus: true, lights: true, music: "spotify:playlist:37i9dQZF1DX5trt9i14X7j"}
+schedule: {morning_brief: "08:55", morning_days: "mon-sat", wrap_nudge: "23:00"}
+limits: {actions_per_minute: 20, max_commands_per_message: 5, approval_ttl_s: 300}

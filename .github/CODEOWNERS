@@ -1,0 +1,12 @@
+roomservice/contracts/   @InnoShay @yash-144
+roomservice/switch/      @InnoShay
+roomservice/desk/        @InnoShay
+roomservice/agents/desk.py   @InnoShay
+roomservice/agents/backup.py @InnoShay
+roomservice/relay.py     @InnoShay
+roomservice/hud/         @yash-144
+roomservice/agents/life.py   @yash-144
+roomservice/scheduler.py @yash-144
+switch/                  @yash-144
+n8n/ infra/ demo/ docs/  @yash-144
+SPEC.md DECISIONS.md     @InnoShay @yash-144
