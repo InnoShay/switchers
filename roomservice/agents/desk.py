@@ -35,6 +35,7 @@ from roomservice.desk.grammar import Command, ParseError, parse_message
 from roomservice.desk.ignition import Ignition
 from roomservice.desk.state import StateManager
 from roomservice.log import get_logger
+from roomservice.relay import BuilderAsk, Relay  # RS-10
 from roomservice.voice import SpeechQueue
 
 log = get_logger("desk")
@@ -166,6 +167,15 @@ class DeskAgent(BaseProtocolAgent):
             on_ignite=self._mark_ignited,
             bus=bus,
         )
+        # -- RS-10 relay: mirrors mission rooms into HQ (SPEC §13) --
+        self.relay = Relay(
+            settings=settings,
+            approvals=self.approvals,
+            hq_rooms=self.hq_rooms,
+            post=lambda room_id, text: self.http.post(room_id, text),
+            upload=lambda rid, png, fn, cap: self.http.upload(rid, [(fn, png, "image/png")], cap),
+            reply=lambda room, text, thread: self._safe_reply(room, text, thread),
+        )
 
     def _mark_ignited(self) -> None:
         self.actions.last_ignite = self.actions.clock()
@@ -248,11 +258,14 @@ class DeskAgent(BaseProtocolAgent):
     def wants_unaddressed(self, room: RoomInfo, msg: MessagePayload) -> bool:
         if self.ignition.matches(room, msg):
             return True
+        if self.relay.wants(room, msg):  # RS-10
+            return True
         return msg.sender in owner_ids() and parse_resolution(msg.body) is not None
 
     async def on_message(self, room: RoomInfo, ev: DomainEvent, msg: MessagePayload) -> None:
         self._rooms_seen[room.id] = room
         owner = msg.sender in owner_ids()
+        await self.relay.observe(room, msg, is_owner=owner)  # RS-10
         if self.ignition.matches(room, msg):
             await self.ignition.fire(room, msg)
         if owner and (parsed := parse_resolution(msg.body)) is not None:
@@ -403,6 +416,18 @@ class DeskAgent(BaseProtocolAgent):
         r = self.approvals.resolve(text, msg.sender, msg.sender_name, owner_ids(), is_agent=False)
         if r is None:
             return
+        if r.approval and isinstance(r.approval.payload, BuilderAsk):  # RS-10
+            ok = r.result == "ok"
+            if r.result in ("ok", "no"):
+                await self.relay.answer(r.approval, ok)
+                await self._safe_reply(
+                    room,
+                    receipts.approved(msg.sender_name, "builder answered yes", 0.0)
+                    if ok
+                    else receipts.declined(msg.sender_name, r.approval.cmd),
+                    msg.thread_id,
+                )
+            return
         if r.result == "unknown":
             await self._safe_reply(
                 room, receipts.refused(text, f"no open approval {r.code}"), msg.thread_id
@@ -442,6 +467,7 @@ class DeskAgent(BaseProtocolAgent):
         while True:
             await asyncio.sleep(SWEEP_EVERY_S)
             self.approvals.sweep()
+            await self.relay.tick()  # RS-10
 
     def _room_for(self, room_id: str) -> RoomInfo | None:
         if self.watcher and (r := self.watcher.room(room_id)):
@@ -522,6 +548,21 @@ class DeskAgent(BaseProtocolAgent):
             await self._safe_reply(room, receipts.frozen("HUD") if on else receipts.unfrozen("HUD"))
 
     # -- replies ------------------------------------------------------------------------
+
+    async def reply(self, room: RoomInfo, text: str, thread_id: str | None = None) -> None:
+        await super().reply(room, text, thread_id)
+        await self.relay.on_desk_post(room, text)  # RS-10
+
+    async def upload(
+        self,
+        room: RoomInfo,
+        png: bytes,
+        filename: str,
+        caption: str,
+        thread_id: str | None = None,
+    ) -> None:
+        await super().upload(room, png, filename, caption, thread_id)
+        await self.relay.on_desk_upload(room, png, filename, caption)  # RS-10
 
     async def _safe_reply(self, room: RoomInfo, text: str, thread_id: str | None = None) -> None:
         try:
