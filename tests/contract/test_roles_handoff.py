@@ -161,6 +161,7 @@ async def test_lease_lapse_hands_over_to_backup_and_announces(fixtures_dir, monk
         text = "🫱 hands is now on desk-backup"
         await wait_for(lambda: bodies(fake).count(text) >= 2)  # mission room + HQ
         assert backup.role_room.id == "room-2"
+        await wait_for(lambda: any(e.type == "transfer" for e in events))
         transfer = next(e for e in events if e.type == "transfer")
         assert transfer.to_agent == "desk-backup"
         # backup keeps its own lease alive
