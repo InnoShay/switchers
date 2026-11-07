@@ -20,7 +20,7 @@ from roomservice.contracts.agent import RoomInfo, RoomKind
 from roomservice.contracts.config import DeskConfig, Settings
 from roomservice.contracts.events import IgnitionEvent
 from roomservice.contracts.switch import MessagePayload
-from roomservice.desk import receipts
+from roomservice.desk import discover, receipts
 from roomservice.desk.grammar import Command
 from roomservice.log import get_logger
 
@@ -75,6 +75,7 @@ class Ignition:
         self._last: float | None = None
         self._seen: OrderedDict[str, None] = OrderedDict()
         self._phrases = [normalize(p) for p in cfg.ignition.wake_phrases if p.strip()]
+        self._wake_words = {w for p in self._phrases for w in p.split()}
 
     # -- pure checks --------------------------------------------------------------------
 
@@ -93,7 +94,8 @@ class Ignition:
                 k = normalize(kw)
                 if k.strip() and k in text:
                     return name
-        return self.cfg.ignition.default_profile
+        found = discover.ignition_target(body, self._wake_words)  # RS-07: any folder
+        return found or self.cfg.ignition.default_profile
 
     # -- action -------------------------------------------------------------------------
 

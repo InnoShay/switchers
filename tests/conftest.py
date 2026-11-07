@@ -25,3 +25,12 @@ def fresh_bus():
     from roomservice.bus import Bus
 
     return Bus()
+
+
+@pytest.fixture(autouse=True)
+def projects_root(tmp_path, monkeypatch):
+    """RS-07: discovery never sees the real ~/cooks."""
+    root = tmp_path / "projects-root"
+    root.mkdir()
+    monkeypatch.setenv("ROOMSERVICE_PROJECTS_DIR", str(root))
+    return root

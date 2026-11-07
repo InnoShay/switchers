@@ -11,7 +11,7 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -31,7 +31,8 @@ from roomservice.contracts.events import (
     now_ms,
 )
 from roomservice.contracts.os import OSAdapter, RunResult
-from roomservice.desk import allowlist, receipts
+from roomservice.desk import allowlist, discover, receipts
+from roomservice.desk.execcmd import EXEC_MAX_CHARS, EXEC_TIMEOUT_S, ShellRunner
 from roomservice.desk.grammar import Command
 from roomservice.desk.state import SLUG_RE, NoActiveMission, StateManager
 from roomservice.log import get_logger
@@ -50,6 +51,8 @@ HELP_TEXT = "\n".join(
         "open <app> · close <app|all> · url <alias|https-url> · focus on|off",
         'shot [screen|page] · say "<text>" · lights on|off',
         'run <script> · commit "<msg>" · push   (asks for approval)',
+        'exec "<command>" — any shell command, ALWAYS asks for approval (bash -lc, 120 s)',
+        "projects — list the projects the desk can open (configured + folders under the root)",
         "status · help · release",
         "owner only: ok|no <CODE> · pause · unpause · pair <6 digits>",
     ]
@@ -58,6 +61,14 @@ HELP_TEXT = "\n".join(
 
 class Refuse(Exception):
     """A command that must not (or cannot) run; the message is the one-line reason."""
+
+
+class Reply(Refuse):
+    """A refusal that carries its own full receipt text (RS-07: discovery answers)."""
+
+    def __init__(self, reason: str, text: str) -> None:
+        super().__init__(reason)
+        self.text = text
 
 
 @dataclass
@@ -163,6 +174,9 @@ class DeskActions:
         self.last_project: str | None = None
         self.opened: dict[str, list[str]] = {"apps": [], "urls": [], "terminals": []}
         self.booted_opened: dict[str, dict[str, list[str]]] = {}
+        self.dynamic: dict[str, discover.Detected] = {}  # RS-07: projects found on disk
+        self.shell = ShellRunner()  # RS-07: approved `exec` only
+        self.bg_procs: list[Any] = []  # RS-07: dev servers started by the desk
 
     # -- helpers ------------------------------------------------------------------------
 
@@ -174,12 +188,37 @@ class DeskActions:
         self.bus.publish(SpeakEvent(text=text))
         self.speech.say(text)
 
+    def _known(self, name: str | None) -> Project | None:
+        if not name:
+            return None
+        if name in self.cfg.projects:
+            return self.cfg.projects[name]
+        if name in self.dynamic:
+            return self.dynamic[name].project
+        a = self.state.active
+        if a and a.project == name and a.path and Path(a.path).is_dir():  # after a restart
+            self.dynamic[name] = discover.detect(name, Path(a.path))
+            return self.dynamic[name].project
+        return None
+
     def current_project(self) -> tuple[str, Project] | None:
         a = self.state.active
-        name = a.project if a and a.project in self.cfg.projects else self.last_project
-        if name and name in self.cfg.projects:
-            return name, self.cfg.projects[name]
+        for name in (a.project if a else None, self.last_project):
+            if name and (p := self._known(name)) is not None:
+                return name, p
         return None
+
+    def _find(self, name: str) -> tuple[str, Project, discover.Detected | None]:
+        """desk.yaml first, else a directory under the projects root(s) (RS-07)."""
+        if name in self.cfg.projects:
+            return name, self.cfg.projects[name], None
+        r = discover.resolve_project(name)
+        if isinstance(r, discover.Ambiguous):
+            raise Reply("which one?", r.text)
+        if isinstance(r, discover.NotFound):
+            raise Reply(f"no project called {name}", r.text)
+        self.dynamic[r.name] = r.detected
+        return r.name, r.project, r.detected
 
     def app_target(self, key: str) -> str:
         t = self.cfg.apps[key]
@@ -247,6 +286,8 @@ class DeskActions:
             if a[0] == "all":
                 return "close all", pname
             self._app(a[0])
+        if v == "exec":  # RS-07: always approval-gated
+            return receipts.fmt_cmd("exec", [self._exec_text(a)]), pname or "~"
         if v == "run":
             if len(a) != 1:
                 raise Refuse("usage: run <script-key>")
@@ -280,7 +321,7 @@ class DeskActions:
         try:
             return await handler(cmd.args, ctx)
         except Refuse as e:
-            return ActionResult(False, reason=str(e))
+            return ActionResult(False, reason=str(e), text=getattr(e, "text", None))
         except Exception as e:  # one line, no stack trace in chat
             log.exception("action %s failed", cmd.verb)
             return ActionResult(False, reason=f"failed: {type(e).__name__}: {e}"[:200])
@@ -310,7 +351,8 @@ class DeskActions:
             return await self._boot_project(name, self.cfg.projects[name])
         if name in self.cfg.profiles:
             return await self._boot_profile(name)
-        raise Refuse("unknown project or profile")
+        found, p, det = self._find(name)  # RS-07: any folder under the projects root
+        return await self._boot_project(found, p, det)
 
     async def _open_editor(self, path: Path, res: BootResult, project: str) -> None:
         try:
@@ -361,14 +403,27 @@ class DeskActions:
         except Exception as e:
             res.notes.append(f"music failed ({e})"[:80])
 
-    async def _boot_project(self, name: str, p: Project) -> BootResult:
+    async def _boot_project(
+        self, name: str, p: Project, det: discover.Detected | None = None
+    ) -> BootResult:
         if not self.dry and not p.path.exists():
             raise Refuse(f"project path missing: {p.path}")
         res = BootResult()
         if p.lights and not self.ignited_recently():
             await self.lights(True, name)
-        if p.open_editor:
+        opened_xcode = det is not None and det.xcode is not None
+        if opened_xcode:
+            opened_xcode = await self._open_xcode(det, res, name)  # type: ignore[arg-type]
+        if not opened_xcode and (p.open_editor or det is not None):
             await self._open_editor(p.path, res, name)
+        fallback_ports = False
+        if det is not None and det.dev_argv and not self.dry:
+            url = await self._start_dev(det, res)
+            if url:
+                p = p.model_copy(update={"terminals": [], "urls": [url], "screenshot_url": url})
+                self.dynamic[name] = replace(det, project=p, install_argv=None)
+            else:
+                fallback_ports = True
         n_term = 0
         for t in p.terminals:
             try:
@@ -379,6 +434,9 @@ class DeskActions:
                 res.notes.append(f"terminal {t.name} failed ({e})"[:80])
         if n_term:
             res.parts.append(_plural(n_term, "terminal"))
+        if fallback_ports and det is not None and (url := await self._probe_common_ports()):
+            p = p.model_copy(update={"urls": [url], "screenshot_url": url})
+            self.dynamic[name] = replace(det, project=p, install_argv=None)
         if p.wait_for and not self.dry and not await self._wait_for(p.wait_for):
             res.notes.append(f"{p.wait_for} not up after {WAIT_FOR_TIMEOUT_S}s")
         tabs = 0
@@ -393,6 +451,55 @@ class DeskActions:
         self.state.mark_booted(name)
         self.last_project = name
         return res
+
+    async def _open_xcode(self, det: discover.Detected, res: BootResult, project: str) -> bool:
+        """Open the .xcworkspace/.xcodeproj with `open` (macOS) instead of the editor."""
+        assert det.xcode is not None
+        try:
+            if self.adapter.name == "macos":
+                r = await self.adapter.run(["open", str(det.xcode)], det.path, 30)
+                if r.code != 0:
+                    raise RuntimeError(_last_line(r))
+            elif self.dry:
+                await self.adapter.open_app("Xcode")
+            else:
+                res.notes.append("xcode needs macOS")
+                return False
+        except Exception as e:
+            res.notes.append(f"xcode failed ({e})"[:80])
+            return False
+        res.parts.append("xcode")
+        self._record("apps", "xcode", project)
+        return True
+
+    async def _start_dev(self, det: discover.Detected, res: BootResult) -> str | None:
+        """Install deps if missing, run the dev command in the background, capture its URL."""
+        if det.install_argv:
+            r = await self.adapter.run(det.install_argv, det.path, 600)
+            if r.code != 0:
+                res.notes.append(f"{' '.join(det.install_argv)} failed: {_last_line(r)}"[:80])
+                return None
+            res.parts.append("deps")
+        assert det.dev_argv
+        url, proc = await discover.launch_dev_server(det.dev_argv, det.path)
+        if url and proc:
+            self.bg_procs.append(proc)
+            res.parts.append("dev server")
+            self._record("terminals", "dev", det.name)
+            log.info("dev server for %s at %s", det.name, url)
+        else:
+            res.notes.append("no dev url in 45s, opened a terminal")
+        return url
+
+    async def _probe_common_ports(self) -> str | None:
+        deadline = self.clock() + WAIT_FOR_TIMEOUT_S
+        while True:
+            for port in discover.COMMON_PORTS:
+                if await self._probe(f"http://localhost:{port}"):
+                    return f"http://localhost:{port}"
+            if self.clock() >= deadline:
+                return None
+            await self._sleep(1.0)
 
     async def _boot_profile(self, name: str) -> BootResult:
         prof = self.cfg.profiles[name]
@@ -442,9 +549,7 @@ class DeskActions:
     async def _v_resume(self, a: list[str], ctx: ActionContext) -> ActionResult:
         if len(a) != 1:
             raise Refuse("usage: resume <project>")
-        name = a[0]
-        if name not in self.cfg.projects:
-            raise Refuse("unknown project")
+        name = self._find(a[0])[0]
         saved = self.state.latest_state(name)
         if self.state.is_booted(name):
             res = BootResult(parts=["already booted"], urls=list(
@@ -479,14 +584,14 @@ class DeskActions:
             raise Refuse("invalid task name")
         if project.lower() == "none":
             project = ""
-        elif project not in self.cfg.projects:
-            raise Refuse("unknown project")
+        else:
+            project = self._find(project)[0]
         ok, holder = await self.roles.assume_hands(ctx.room)
         if not ok:
             who = holder or "someone else"
             return ActionResult(False, reason=f"the computer is busy with {who}",
                                 text=receipts.refused_held(who))  # fmt: skip
-        p = self.cfg.projects[project] if project else None
+        p = self._known(project) if project else None
         auto = self.state.start_mission(
             slug, project or None, p.path if p else None, p.screenshot_url if p else None
         )
@@ -551,6 +656,44 @@ class DeskActions:
         res = await self.adapter.run(list(script.cmd), cwd, script.timeout_s)
         tail = "\n".join(x for x in (res.stdout_tail, res.stderr_tail) if x)
         return ActionResult(True, summary=f"exit {res.code}", detail=tail, warn=res.code != 0)
+
+    # -- RS-07: free-form exec (approval-gated) and project listing ----------------------
+
+    @staticmethod
+    def _exec_text(args: list[str]) -> str:
+        text = " ".join(args).strip()
+        if not text:
+            raise Refuse('usage: exec "<command>"')
+        if len(text) > EXEC_MAX_CHARS:
+            raise Refuse(f"command longer than {EXEC_MAX_CHARS} chars")
+        if any(c in text for c in "\n\r\0"):
+            raise Refuse("one line only")
+        return text
+
+    def exec_cwd(self) -> Path:
+        a = self.state.active
+        if a and a.project and a.path and Path(a.path).is_dir():
+            return Path(a.path)
+        return discover.first_root() or Path.home()
+
+    def kill_exec(self) -> bool:
+        return self.shell.kill()
+
+    async def _v_exec(self, a: list[str], ctx: ActionContext) -> ActionResult:
+        if not ctx.approved:
+            raise Refuse("exec needs approval")
+        text = self._exec_text(a)
+        cwd = self.exec_cwd()
+        if self.dry:
+            res = await self.adapter.run(["bash", "-lc", text], cwd, EXEC_TIMEOUT_S)
+        else:
+            res = await self.shell.run(text, cwd, EXEC_TIMEOUT_S)
+        out = "\n".join(x for x in (res.stdout_tail, res.stderr_tail) if x)
+        out = "\n".join(out.splitlines()[-15:])
+        return ActionResult(True, summary=f"exit {res.code}", detail=out, warn=res.code != 0)
+
+    async def _v_projects(self, a: list[str], ctx: ActionContext) -> ActionResult:
+        return ActionResult(True, summary=discover.projects_text(self.cfg))
 
     async def _v_focus(self, a: list[str], ctx: ActionContext) -> ActionResult:
         if len(a) != 1 or a[0].lower() not in ("on", "off"):

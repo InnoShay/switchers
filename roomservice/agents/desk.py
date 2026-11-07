@@ -45,7 +45,7 @@ from roomservice.voice import SpeechQueue
 
 log = get_logger("desk")
 
-OWNER_ONLY = frozenset({"ok", "no", "freeze", "unfreeze"})
+OWNER_ONLY = frozenset({"ok", "no", "freeze", "unfreeze", "exec"})
 FROZEN_OK = frozenset({"unfreeze", "status", "help"})
 PAIR_TTL_S = 600
 PAIR_MAX_FAILS = 5
@@ -338,7 +338,7 @@ class DeskAgent(BaseProtocolAgent):
 
     async def _dispatch(self, cmd: Command, room: RoomInfo, msg: MessagePayload, owner: bool):
         v = cmd.verb
-        if v in OWNER_ONLY and not owner:
+        if (v in OWNER_ONLY and not owner) or (v == "exec" and await self._is_agent(room, msg)):
             await self._safe_reply(room, receipts.refused(cmd.raw, "owner only"), msg.thread_id)
         elif v in ("ok", "no"):
             if len(cmd.args) != 1:
@@ -595,6 +595,8 @@ class DeskAgent(BaseProtocolAgent):
     async def set_frozen(self, on: bool, by: str) -> None:
         self.frozen = on
         self.actions.runtime.frozen = on
+        if on:
+            self.actions.kill_exec()  # RS-07: stop a running approved `exec`
         self.bus.publish(FreezeEvent(on=on))
         log.info("frozen=%s by %s", on, by)
 
