@@ -28,9 +28,8 @@ def fresh_bus():
 
 
 @pytest.fixture(autouse=True)
-def projects_root(tmp_path, monkeypatch):
-    """RS-07: discovery never sees the real ~/cooks."""
-    root = tmp_path / "projects-root"
-    root.mkdir()
+def projects_root(tmp_path_factory, monkeypatch):
+    """RS-07: discovery never sees the real ~/cooks; own dir keeps tmp_path clean."""
+    root = tmp_path_factory.mktemp("projects-root")
     monkeypatch.setenv("ROOMSERVICE_PROJECTS_DIR", str(root))
     return root
