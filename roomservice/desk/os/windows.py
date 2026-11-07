@@ -20,7 +20,8 @@ class WindowsAdapter:
         await base.exec_ok(["taskkill", "/IM", exe, "/F"])
 
     async def open_url(self, url: str) -> None:
-        await base.exec_ok(["cmd", "/c", "start", "", url])
+        # not `cmd /c start`: cmd would treat `&`, `|`, `^` inside the URL as command separators
+        await base.exec_ok(["rundll32", "url.dll,FileProtocolHandler", url])
 
     async def open_in_editor(self, path: Path) -> None:
         await base.exec_ok(["code.cmd", str(path)])
@@ -38,7 +39,10 @@ class WindowsAdapter:
         return await base.screenshot_primary()
 
     async def speak(self, text: str, voice: str, rate: int) -> None:
-        safe = text.replace("'", "''")
+        # PowerShell also treats the typographic single quotes as string delimiters
+        safe = text
+        for q in "'\u2018\u2019\u201a\u201b":
+            safe = safe.replace(q, q + q)
         script = (
             "Add-Type -AssemblyName System.Speech; "
             f"(New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('{safe}')"

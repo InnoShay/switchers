@@ -97,7 +97,7 @@ async def test_windows_argv(calls):
         ("cmd", "/c", "start", "", "spotify"),
         ("taskkill", "/IM", "spotify.exe", "/F"),
         ("taskkill", "/IM", "code.exe", "/F"),
-        ("cmd", "/c", "start", "", "https://github.com"),
+        ("rundll32", "url.dll,FileProtocolHandler", "https://github.com"),
         ("code.cmd", str(Path("C:/p"))),
         ("wt", "-d", str(Path("C:/p")), "cmd", "/k", "npm run dev"),
     ]
