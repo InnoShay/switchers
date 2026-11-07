@@ -312,7 +312,7 @@ async def test_a14_hud_freeze_banner_then_commands_refused_until_unfreeze(desk):
     await say(desk, "@hands status")
     await say(desk, "@hands help")
     await desk.drain()
-    assert any(p.startswith("✅ status") and "paused yes" in p for p in posts(desk))
+    assert any(p.startswith("✅ status") and "Paused: yes" in p for p in posts(desk))
     assert any("boot <project>" in p for p in posts(desk))
     assert ops(desk, "open_app") == [] and ops(desk, "open_url") == []
     await desk.bus.on_freeze(False)

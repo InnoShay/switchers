@@ -91,7 +91,11 @@ async def test_serial_order_and_queued_receipt(desk):
     await desk.drain()
     p = posts(desk)
     done = [x for x in p if x.startswith("✅")]
-    assert [x.split(" ·")[0] for x in done] == ["✅ open browser", "✅ say hi", "✅ status"]
+    assert [x.split(" ·")[0].split("\n")[0] for x in done] == [
+        "✅ open browser",
+        "✅ say hi",
+        "✅ status",
+    ]
     queued = [x for x in p if x.startswith("⏳ queued · ")]
     assert queued and all("(busy with " in x for x in queued)
     # a queued receipt always precedes that command's own result
@@ -125,7 +129,7 @@ async def test_freeze_and_unfreeze(desk):
     await say(desk, "@hands status")
     await say(desk, "@hands help")
     await desk.drain()
-    assert any(x.startswith("✅ status") and "paused yes" in x for x in posts(desk))
+    assert any(x.startswith("✅ status") and "Paused: yes" in x for x in posts(desk))
     assert any(x.startswith("@hands <verb>") or "boot <project>" in x for x in posts(desk))
     await say(desk, "@hands unfreeze")
     assert not desk.frozen
