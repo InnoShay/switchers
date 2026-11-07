@@ -302,3 +302,44 @@ async def test_shot_page_falls_back_to_screen_with_suffix(desk, monkeypatch):  #
     await say(desk, "@hands shot page")
     await desk.drain()
     assert uploads and uploads[-1].endswith("(screen fallback)")
+
+
+# -- RS-10: loop guards -------------------------------------------------------------------
+
+
+async def test_mentions_are_neutralised_in_mirrors(rig):
+    await rig.relay.observe(MISSION, msg("plan\n@hands shot page\n@desk-backup hi"))
+    out = rig.texts()
+    assert out and all("@hands" not in t and "@desk-" not in t for t in out)
+    assert "＠hands shot page" in out[0]
+
+
+async def test_hq_originated_messages_are_never_mirrored(rig):
+    await rig.relay.observe(HQ, msg("plan\nanything"))
+    assert rig.out == []
+
+
+async def test_auto_replies_and_desk_senders_are_ignored(rig):
+    offline = "@desk-backup I'm currently offline — my connector isn't reporting in."
+    await rig.relay.observe(MISSION, msg(offline, name="concierge"))
+    await rig.relay.observe(MISSION, msg("builder done", name="desk-laptop"))
+    marked = msg("some plan", name="concierge")
+    await rig.relay.observe(MISSION, marked, raw={"com.switch.auto_reply": True})
+    assert rig.out == []
+
+
+async def test_safety_valve_stops_mirroring_and_warns(rig):
+    events = []
+
+    class FakeBus:
+        def publish(self, ev):
+            events.append(ev)
+
+    rig.relay._bus = FakeBus()
+    with freeze_time("2026-01-01 00:00:00") as t:
+        for i in range(40):
+            room = RoomInfo(id=f"m{i}", name=f"mission-{i}", kind=RoomKind.MISSION)
+            await rig.relay._mirror(room, "x")
+            t.tick(1)
+    assert len(rig.texts()) == 2 * 31  # 31 mirrors x 2 HQ rooms, then the valve closes
+    assert len(events) == 1 and events[0].level == "warn"

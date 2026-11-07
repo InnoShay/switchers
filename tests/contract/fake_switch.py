@@ -72,15 +72,22 @@ def message_frame(
 class FakeSwitch:
     def __init__(
         self,
-        scripts: list[list[dict]] | None = None,
+        scripts: list[list[dict]] | dict[str, list[dict]] | None = None,
         *,
         ping_every: float = 0.2,
         generation: int = 7,
         rooms: list[dict] | None = None,
         lease_ttl: float | None = None,
         port: int = 0,
+        auto_reply: Any = None,
     ) -> None:
         self.port = port
+        # RS-10: `auto_reply(body) -> str | None`. When a post's body makes it return text, the
+        # fake pushes that text back into the same room as a message from desk-laptop carrying
+        # the Switch auto-reply marker (what Switch does for a mention of an offline agent).
+        self.auto_reply = auto_reply
+        self._conns: list[tuple[str, list[str], asyncio.Queue]] = []
+        self._auto_seq = 1000
         self.scripts = scripts or []
         self.ping_every = ping_every
         self.generation = generation
@@ -118,6 +125,24 @@ class FakeSwitch:
 
     def _agent_name(self, agent_id: str) -> str:
         return next((n for n, a in self.agents.items() if a["id"] == agent_id), agent_id)
+
+    def _maybe_auto_reply(self, room_ids: list[str], body: str) -> None:
+        text = self.auto_reply(body) if self.auto_reply and body else None
+        if not text:
+            return
+        self._auto_seq += 1
+        n = self._auto_seq
+        frame = message_frame(
+            n,
+            text,
+            room_id=room_ids[0],
+            sender="@laptop:srv",
+            sender_name="desk-laptop",
+        )["send"]
+        frame["data"]["payload"]["com.switch.auto_reply"] = True
+        for _cid, rooms, q in self._conns:
+            if room_ids[0] in rooms:
+                q.put_nowait(frame)
 
     def calls_named(self, name: str) -> list[dict]:
         return [c for c in self.calls if c["name"] == name]
@@ -177,6 +202,10 @@ class FakeSwitch:
             args = await request.json() if await request.body() else {}
             conn_id = request.headers.get("x-switch-connection-id")
             fake._rec(f"op:{op_name}", args=args, conn_id=conn_id, auth=authed(request))
+            if op_name == "post_message":
+                rooms = next((r for c, r, _ in fake._conns if c == conn_id), [])
+                if rooms:
+                    fake._maybe_auto_reply(rooms[:1], args.get("body", ""))
             if op_name == "list_rooms":
                 return {"result": fake.rooms}
             if op_name == "connect_to_room":
@@ -218,6 +247,7 @@ class FakeSwitch:
         async def message(agent_id: str, request: Request):
             body = await request.json()
             fake._rec("message", body=body, auth=authed(request))
+            fake._maybe_auto_reply([body.get("room_id", "")], body.get("content", ""))
             return {"ok": True, "event_id": "evt-1"}
 
         @app.post("/agents/{agent_id}/rooms/{room_id}/media")
@@ -271,7 +301,10 @@ class FakeSwitch:
                 }
             )
             fake._rec("ws_open", query=q)
-            script = fake.scripts[idx] if idx < len(fake.scripts) else []
+            if isinstance(fake.scripts, dict):  # keyed by room id
+                script = fake.scripts.get(q.get("rooms", ""), [])
+            else:
+                script = fake.scripts[idx] if idx < len(fake.scripts) else []
             await fake._serve_ws(ws, agent_id, q, script)
 
         return app
@@ -291,6 +324,13 @@ class FakeSwitch:
             }
         )
         outstanding: list[float] = []
+        inject: asyncio.Queue = asyncio.Queue()
+        entry = (q.get("connection_id") or "", (q.get("rooms") or "").split(","), inject)
+        self._conns.append(entry)
+
+        async def injector() -> None:
+            while True:
+                await ws.send_json(await inject.get())
 
         async def pinger() -> None:
             while True:
@@ -312,7 +352,11 @@ class FakeSwitch:
             except (WebSocketDisconnect, RuntimeError):
                 return
 
-        tasks = [asyncio.create_task(pinger()), asyncio.create_task(reader())]
+        tasks = [
+            asyncio.create_task(pinger()),
+            asyncio.create_task(reader()),
+            asyncio.create_task(injector()),
+        ]
         try:
             for step in script:
                 if "send" in step:
@@ -328,3 +372,5 @@ class FakeSwitch:
         finally:
             for t in tasks:
                 t.cancel()
+            if entry in self._conns:
+                self._conns.remove(entry)
