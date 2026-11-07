@@ -107,7 +107,7 @@ The HUD opens at <http://127.0.0.1:7777>. From your phone, say "Room service, to
 
 - **Calendar and email (the Assistant)**: `n8n/README.md`.
 - **Backup computer**: `ROOMSERVICE_AGENT=desk-backup ROOMSERVICE_DESK_CONFIG=config/desk.backup.yaml HUD_PORT=7778 uv run roomservice backup` (copy `config/desk.yaml` to `config/desk.backup.yaml` and set `machine_name: backup`). Stop the main desk and the backup takes over within about 15 seconds.
-- **Open any project, run anything with approval**: `docs/power.md`. Set `ROOMSERVICE_PROJECTS_DIR` to your projects folder.
+- **Open any project, run anything with approval**: `docs/power.md`. Point it at your projects folder with `export ROOMSERVICE_PROJECTS_DIR=~/code` before starting the desk (default `~/cooks`).
 
 ## Troubleshooting
 
