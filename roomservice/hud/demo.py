@@ -33,7 +33,7 @@ from roomservice.contracts.events import (
 SAMPLE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "sample-shot.png"
 SHOT_NAME = "shot-volt-143201.png"
 SLUG = "volt-waitlist"
-HQ, MISSION = "RoomService HQ", f"mission-{SLUG}"
+HQ, MISSION = "Main chat", f"task-{SLUG}"
 _CREW = ["you", "concierge", "builder", "scout", "hands", "life"]
 
 
@@ -84,9 +84,9 @@ async def _script() -> None:
         _msg(
             HQ,
             "hq",
-            "Concierge",
+            "Planner",
             "concierge",
-            f"Mission card: {SLUG}. Crew assembled in {MISSION}.",
+            f"Task card: {SLUG}. Team assembled in {MISSION}.",
         )
     )
     p(AgentStateEvent(agent="concierge", state="idle"))
@@ -94,7 +94,7 @@ async def _script() -> None:
         _msg(
             MISSION,
             "mission",
-            "Concierge",
+            "Planner",
             "concierge",
             "Plan: build the page, show a shot. @builder go.",
             True,
@@ -105,7 +105,7 @@ async def _script() -> None:
         _msg(
             MISSION,
             "mission",
-            "Life",
+            "Assistant",
             "life",
             "Calendar blocked 21:00 to 23:00. Reminder set for 23:00.",
         )
@@ -121,7 +121,7 @@ async def _script() -> None:
         _msg(
             MISSION,
             "mission",
-            "Scout",
+            "Researcher",
             "scout",
             "Found 3 reference waitlist pages. Registered in the room.",
         )
@@ -158,14 +158,14 @@ async def _script() -> None:
     await asyncio.sleep(3)
     p(FreezeEvent(on=False))
     p(TransferEvent(from_agent="desk-laptop", to_agent="desk-backup"))
-    p(SystemEvent(level="warn", text="hands is now on desk-backup"))
+    p(SystemEvent(level="warn", text="the Computer is now on the Backup computer"))
     await asyncio.sleep(6)
 
     p(ActionStartEvent(id="a5", verb="wrap", args=[], room=MISSION))
     await asyncio.sleep(2)
     p(ActionEndEvent(id="a5", ok=True, ms=2000, summary="wrap · volt-waitlist · 96 min"))
     p(SpeakEvent(text="Goodnight."))
-    p(_msg(HQ, "hq", "Hands", "hands", "✅ wrap · volt-waitlist · 96 min"))
+    p(_msg(HQ, "hq", "Computer", "hands", "✅ wrap · volt-waitlist · 96 min"))
     p(ApprovalOpenEvent(code="X9AF", cmd="close all", expires_at=now_ms() + 6_000))
     await asyncio.sleep(7)
     p(ApprovalClosedEvent(code="X9AF", result="expired", by=None))

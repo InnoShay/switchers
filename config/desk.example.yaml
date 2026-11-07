@@ -3,7 +3,7 @@ machine_name: laptop
 timezone: Asia/Kolkata
 voice: {enabled: true, voice_name: Samantha, rate: 190}
 ignition:
-  wake_phrases: ["room service", "roomservice", "room servis", "rumservice", "room sarvis"]
+  wake_phrases: ["room service", "hey computer", "roomservice", "room servis", "rumservice", "room sarvis"]
   default_profile: focus-session
 apps:
   editor:   {mac: "Visual Studio Code", win: "code", linux: "code"}

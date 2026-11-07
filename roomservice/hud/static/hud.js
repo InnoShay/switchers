@@ -1,14 +1,14 @@
-// Mission Control HUD frontend (SPEC §16): the live Switch network map. Plain ES modules, no build step.
+// Control Room HUD frontend (SPEC §16): the live Switch network map. Plain ES modules, no build step.
 // Every piece of chat text is written with textContent, never innerHTML.
 import { NetMap } from "./netmap.js";
 import { Sfx } from "./sfx.js";
 
-const NAMES = { you: "You", concierge: "Concierge", builder: "Builder", scout: "Scout", hands: "Hands", life: "Life" };
+const NAMES = { you: "You", concierge: "Planner", builder: "Builder", scout: "Researcher", hands: "Computer", life: "Assistant" };
 const CREW = ["you", "concierge", "builder", "scout", "hands", "life"];
 const FEED_MAX = 60;
 const CHIPS_MAX = 8;
 const STALE_MS = 10 * 60 * 1000;
-const MENTION = /@(concierge|builder|scout|life|hands|desk-laptop|desk-backup)\b/gi;
+const MENTION = /@(concierge|planner|builder|scout|researcher|life|assistant|hands|computer|backup|desk-laptop|desk-backup)\b/gi;
 
 const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
@@ -65,7 +65,7 @@ function renderCrew() {
 }
 
 function renderHeader() {
-  $("mission").textContent = S.mission ? `mission-${S.mission}` : "no mission";
+  $("mission").textContent = S.mission ? `task-${S.mission}` : "no task";
   $("c-switch").classList.toggle("ok", S.conn.switch);
   $("c-n8n").classList.toggle("ok", S.conn.n8n);
   $("c-hands").classList.toggle("ok", S.crew.hands !== "offline");
@@ -114,7 +114,7 @@ function showToast(url, caption) {
 
 function showTransfer(from, to) {
   const b = $("transfer");
-  b.textContent = `HANDS TRANSFERRED → ${to}`;
+  b.textContent = `COMPUTER TRANSFERRED → ${to}`;
   b.title = `from ${from}`;
   b.hidden = false;
   clearTimeout(transferTimer);
@@ -211,7 +211,9 @@ function mentionedAgents(body) {
   const out = new Set();
   for (const m of body.matchAll(MENTION)) {
     const n = m[1].toLowerCase();
-    out.add(n.startsWith("desk-") ? "hands" : n);
+    const alias = { planner: "concierge", researcher: "scout", assistant: "life", computer: "hands", backup: "desk-backup" };
+    const k = alias[n] || n;
+    out.add(k.startsWith("desk-") ? "hands" : k);
   }
   return out;
 }
@@ -238,16 +240,16 @@ function handle(ev) {
     }
     case "ignition":
       ignition(ev.lights === "flash");
-      feed(ev.ts, "system", `⚡ ignition · booting ${ev.project}`);
-      demoCaption("Ignition: one sentence wakes the room before any model answers");
+      feed(ev.ts, "system", `⚡ wake-up · booting ${ev.project}`);
+      demoCaption("Wake-up: one sentence wakes the room before any model answers");
       break;
     case "mission":
       S.mission = ev.slug;
       S.startedAt = ev.started_at;
       map.setMission(ev.slug);
       renderHeader();
-      feed(ev.ts, "system", `mission ${ev.slug}${ev.title ? " · " + ev.title : ""}`);
-      demoCaption("A mission room is spawned from a Switch template");
+      feed(ev.ts, "system", `task ${ev.slug}${ev.title ? " · " + ev.title : ""}`);
+      demoCaption("A task room is spawned from a Switch template");
       break;
     case "message": {
       const who = ev.agent in S.crew ? ev.agent : null;
@@ -335,8 +337,8 @@ function handle(ev) {
       map.flow(["hands", "switch", "backup"], "role", "role: hands", 600);
       setTimeout(() => map.setHolder(ev.to_agent), 1000);
       sfx.whoosh();
-      feed(ev.ts, "hands", `🫱 hands transferred ${ev.from_agent} → ${ev.to_agent}`);
-      demoCaption("Hands is a role. It moves to another machine.");
+      feed(ev.ts, "hands", `🫱 computer transferred ${ev.from_agent} → ${ev.to_agent}`);
+      demoCaption("The Computer is a role. It moves to another machine.");
       break;
     case "freeze":
       showFreeze(ev.on);
@@ -375,9 +377,9 @@ async function toggleFreeze() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ on: !S.frozen }),
     });
-    if (!r.ok) feed(Date.now(), "system", `freeze failed (${r.status})`, "warn");
+    if (!r.ok) feed(Date.now(), "system", `pause failed (${r.status})`, "warn");
   } catch {
-    feed(Date.now(), "system", "freeze failed (network)", "warn");
+    feed(Date.now(), "system", "pause failed (network)", "warn");
   }
 }
 

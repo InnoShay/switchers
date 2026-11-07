@@ -2,11 +2,11 @@ version: 1
 params:
   slug:
     type: string
-    label: Mission slug
+    label: Task slug
     pattern: ^[a-z0-9][a-z0-9-]{2,38}$
   title:
     type: string
-    label: Mission title
+    label: Task title
   brief:
     type: string
     label: Spoken brief verbatim
@@ -22,21 +22,21 @@ params:
     - $first
     input: advanced
 room:
-  name: mission-{slug}
-  description: 'RoomService mission: {title}'
+  name: task-{slug}
+  description: 'RoomService task: {title}'
   bridge: '{bridge}'
   channel_type: channel_public
   instructions: |
-    # Mission room
+    # Task room
 
-    This room exists for one mission. The brief is in the document "mission-brief".
-    The owner may not be watching this room; HQ mirrors key events to their phone.
+    This room exists for one task. The brief is in the document "task-brief".
+    The owner may not be watching this room; the main chat mirrors key events to their phone.
 
-    - hands is a program holding the `hands` role. Address @hands with one grammar command
-      per line. It answers with ✅ / ⛔ / ⏳ / ⚠️ receipts.
-    - Risky hands commands (commit, push, close all, scripts marked confirm) wait for the
+    - The Computer is a program holding the `hands` role. Address @computer (or @hands) with
+      one grammar command per line. It answers with ✅ / ⛔ / ⏳ / ⚠️ receipts.
+    - Risky Computer commands (commit, push, close all, scripts marked confirm) wait for the
       owner's approval code. Never try to approve on the owner's behalf.
-    - `@hands status` returns the project path and dev server URL.
+    - `@computer status` returns the project path and dev server URL.
     - Time zone: Asia/Kolkata. Never narrate plumbing.
   agents:
   - concierge
@@ -46,21 +46,26 @@ room:
   - life
   users:
   - '{$creator}'
+  aliases:
+    concierge: planner
+    scout: researcher
+    desk-laptop: computer
+    life: assistant
   roles:
   - name: hands
     exclusive: true
-    instructions: 'The body of the room: a program that executes the hands grammar on a real computer. Address @hands with one command per line.'
+    instructions: 'The body of the room (the Computer): a program that executes the Computer grammar on a real computer. Address @computer (or @hands) with one command per line.'
   docs:
-  - name: mission-brief
-    description: The mission as spoken, its slug and project.
+  - name: task-brief
+    description: The task as spoken, its slug and project.
     instructions: Read first. Do not edit.
     content: |
       # {title}
 
       **Spoken brief:** {brief}
 
-      **Mission slug:** {slug}
+      **Task slug:** {slug}
       **Project key:** {project}
 kickoff: |
-  @desk-laptop mission {slug} {project}
-  @builder the brief is in this room's documents. Wait for the concierge's plan, then start.
+  @desk-laptop task {slug} {project}
+  @builder the brief is in this room's documents. Wait for the Planner's plan, then start.
