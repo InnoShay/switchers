@@ -63,7 +63,7 @@ uv sync
 uv run roomservice hud --demo    # http://127.0.0.1:7777, a scripted story of every event
 ```
 
-`uv run roomservice doctor` checks the whole setup and prints a fix next to every red line.
+`uv run roomservice doctor` checks the whole setup and prints a fix next to every red line. [docs/try-it.md](docs/try-it.md) lists ten things to say once it runs.
 
 ## The team
 
