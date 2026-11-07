@@ -22,3 +22,10 @@ node_modules/
 .DS_Store
 .idea/
 .vscode/
+
+# local machine config and tool state
+config/desk.yaml
+config/desk.backup.yaml
+.impeccable/
+.claude/
+demo/volt/dist/
