@@ -1,0 +1,43 @@
+version: 1
+params:
+  workspace: {type: directory, label: Workspace folder, default: "~/roomservice-workspace"}
+  provider:  {type: provider, default: [claude], input: advanced}
+  location:  {type: location, default: local, input: advanced}
+  bridge:    {type: bridge, default: [Mattermost, $first], input: advanced}
+agents:
+  - name: concierge
+    display_name: Concierge
+    description: Turns one spoken sentence into a mission room, a crew and a plan.
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{workspace}/concierge"
+    addressing: owner-agents
+    auto_mode: true
+    instructions: "@@FILE:concierge.md@@"
+  - name: builder
+    display_name: Builder
+    description: Builds the mission's project and asks hands for proof.
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{workspace}"
+    addressing: owner-agents
+    auto_mode: true
+    instructions: "@@FILE:builder.md@@"
+  - name: scout
+    display_name: Scout
+    description: Finds references and registers them in the mission room.
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{workspace}/scout"
+    addressing: owner-agents
+    auto_mode: true
+    instructions: "@@FILE:scout.md@@"
+room:
+  name: roomservice-hq
+  description: RoomService headquarters. Speak a mission here.
+  bridge: "{bridge}"
+  channel_type: channel_public
+  instructions: "@@FILE:hq-room.md@@"
+  agents: [concierge, builder, scout, desk-laptop, life]
+  users: ["{$creator}"]
+kickoff: "@concierge introduce the crew in three short lines and say you're ready for a mission."

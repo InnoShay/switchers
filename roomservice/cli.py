@@ -351,3 +351,11 @@ def doctor() -> None:
         console.print(format_result(r), markup=False, highlight=False)
     if not all(r.ok for r in results):
         raise typer.Exit(1)
+
+
+@app.command("build-templates")
+def build_templates() -> None:
+    """Build switch/templates/dist/*.yaml from the templates and instruction files."""
+    from roomservice.templates_build import run_build_templates
+
+    run_build_templates()
