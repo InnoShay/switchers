@@ -11,14 +11,26 @@ apps:
   music:    {mac: "Spotify", win: "spotify", linux: "spotify"}
   notes:    {mac: "Notes", win: "notepad", linux: "gedit"}
   terminal: {mac: "Terminal", win: "wt", linux: "x-terminal-emulator"}
+  brave: {mac: "Brave Browser", win: "brave", linux: "brave-browser"}
+  chrome: {mac: "Google Chrome", win: "chrome", linux: "google-chrome"}
+  safari: {mac: "Safari", win: "msedge", linux: "firefox"}
+  finder: {mac: "Finder", win: "explorer", linux: "xdg-open"}
+  xcode: {mac: "Xcode", win: "code", linux: "code"}
+  simulator: {mac: "Simulator", win: "code", linux: "code"}
 urls:
   github: https://github.com
   calendar: https://calendar.google.com
   mail: https://mail.google.com
+  weather: https://www.google.com/search?q=weather
+  markets: https://finance.yahoo.com
+  news: https://news.google.com
 scripts:
   test:   {cmd: ["npm", "test"], cwd: project, confirm: false, timeout_s: 120}
   build:  {cmd: ["npm", "run", "build"], cwd: project, confirm: false, timeout_s: 180}
   deploy: {cmd: ["npx", "vercel", "--prod", "--yes"], cwd: project, confirm: true, timeout_s: 300}
+  git-status: {cmd: ["git", "status", "-sb"], cwd: project, confirm: false, timeout_s: 20}
+  git-diff: {cmd: ["git", "diff", "--stat"], cwd: project, confirm: false, timeout_s: 20}
+  git-log: {cmd: ["git", "log", "--oneline", "-n", "10"], cwd: project, confirm: false, timeout_s: 20}
 projects:
   volt:
     keywords: ["volt", "waitlist"]
