@@ -18,3 +18,8 @@ RS-03: connect_to_room runs right after the first connection_state frame, off th
 RS-03: `refused` with 4xx (except 408/429) and close code 4400 are fatal for that room; other refusals reconnect with backoff — spec only says "log; close".
 RS-03: paired-owner ids are read from every "sender" key in owners.json — RS-07 owns the file format; this only feeds the HUD `you` label.
 RS-03: added python-multipart to the dev dependency group — FastAPI form/file parsing in tests/contract/fake_switch.py.
+RS-05: grammar returns a ParsedMessage (items + refusal) and reports unknown verbs as ParseError — the spec only gives Command/ParseError; extras beyond 5 are dropped with the exact refusal text so the first 5 still run.
+RS-05: "show me" parses to `shot` with the trailing "me" dropped — `show` is an alias of `shot` and the golden path says "show me".
+RS-05: allowlist denial reason is `not on the allowlist` (A13 text is `⛔ refused · <raw> — <reason>`); disallowed URLs say `url not allowed (https or localhost only)`; alias URLs from desk.yaml also pass the URL pattern rule.
+RS-05: Approvals.resolve takes `owner_ids` and `is_agent` from the caller (agent layer knows pairing/identity) and returns None for non-owners/agents, `unknown` for unmatched codes; codes use secrets.choice and a late-bound time.time so freezegun works.
+RS-05: auto-wrap on a new mission keeps the booted set (apps remain open); only explicit `wrap` or `close all` clears it. Wrap `path` is written with `~` for the home dir, as in the §12.8 example; mission slugs must match `[A-Za-z0-9][A-Za-z0-9_-]*` (they become filenames).
