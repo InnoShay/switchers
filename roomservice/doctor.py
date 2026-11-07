@@ -49,8 +49,10 @@ def non_dark_fraction(png: bytes, threshold: int = 40) -> float:
     from PIL import Image
 
     img = Image.open(io.BytesIO(png)).convert("RGB").resize((160, 100))
-    px = list(img.getdata())
-    return sum(1 for p in px if max(p) > threshold) / max(1, len(px))
+    raw = img.tobytes()
+    total = len(raw) // 3
+    lit = sum(1 for i in range(0, total * 3, 3) if max(raw[i : i + 3]) > threshold)
+    return lit / max(1, total)
 
 
 def mac_app_installed(name: str) -> bool:
@@ -148,6 +150,11 @@ class Doctor:
         c = SwitchHTTPClient(self.url, agent_id=cred["id"], api_key=cred["api_key"])
         try:
             raw = parse_rooms(await c.op("list_rooms", {}))
+        except Exception as e:
+            return _bad(
+                "Rooms visible", f"list_rooms failed ({type(e).__name__})",
+                "Check Switch is up and the key is valid (`roomservice register --overwrite`)",
+            )  # fmt: skip
         finally:
             await c.aclose()
         names = []

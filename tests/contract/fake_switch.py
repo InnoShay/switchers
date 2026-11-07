@@ -38,7 +38,15 @@ def close(code: int) -> dict:
     return {"close": code}
 
 
-def message_frame(seq: int, body: str = "hi", *, addressed: bool = True, room_id: str = "room-1"):
+def message_frame(
+    seq: int,
+    body: str = "hi",
+    *,
+    addressed: bool = True,
+    room_id: str = "room-1",
+    sender: str = "@owner:srv",
+    sender_name: str = "owner",
+):
     """A scripted domain frame: {"event": "message", "data": {...}, "id": seq}."""
     return send(
         {
@@ -50,8 +58,8 @@ def message_frame(seq: int, body: str = "hi", *, addressed: bool = True, room_id
                 "sequence": seq,
                 "payload": {
                     "addressed": addressed,
-                    "sender": "@owner:srv",
-                    "sender_name": "owner",
+                    "sender": sender,
+                    "sender_name": sender_name,
                     "message_id": f"m{seq}",
                     "body": body,
                     "timestamp": 1_700_000_000_000 + seq,
@@ -70,7 +78,9 @@ class FakeSwitch:
         generation: int = 7,
         rooms: list[dict] | None = None,
         lease_ttl: float | None = None,
+        port: int = 0,
     ) -> None:
+        self.port = port
         self.scripts = scripts or []
         self.ping_every = ping_every
         self.generation = generation
@@ -116,7 +126,7 @@ class FakeSwitch:
 
     async def start(self) -> FakeSwitch:
         config = uvicorn.Config(
-            self.app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"
+            self.app, host="127.0.0.1", port=self.port, log_level="warning", lifespan="off"
         )
         self._server = uvicorn.Server(config)
         self._task = asyncio.create_task(self._server.serve())
