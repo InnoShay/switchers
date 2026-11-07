@@ -78,3 +78,4 @@ RS-08: decision — palette is neutral ink on paper with one blue for traffic, a
 RS-08: decision — emoji in receipts (✅ ⚠️ 📸 …) are shown as plain markers in the HUD feed and screenshot caption; the chat messages themselves are unchanged.
 RS-08: decision — a `hello` with machine "backup" shows the HANDS badge on desk-backup; any other machine shows it on desk-laptop. The mission timer only runs after a `mission` event (hello carries no start time).
 RS-08: decision — the sound design of §16.3 is kept (sfx.js); the demo script is synthetic and labelled "demo mode" in the feed.
+RS-07: fix — desk ignores ordinary prose (ignition sentence, concierge plan text) instead of replying "didn't understand": the addressed whole-body fallback now yields a command only when its first word is a known verb or alias; explicit `@hands <unknown verb>` lines are still refused.

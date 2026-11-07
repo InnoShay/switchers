@@ -201,8 +201,8 @@ def test_addressed_fallback_whole_body():
 
 
 def test_addressed_fallback_strips_all_at_tokens():
-    r = parse_message("please @hands open @desk-laptop notes", addressed=True)
-    assert r.items == [ParseError("please open notes", "unknown verb 'please'")]
+    r = parse_message("open @desk-laptop notes", addressed=True)
+    assert r.commands == [Command("open", ["notes"], "open notes")]
     r = parse_message("@concierge status", addressed=True)
     assert r.commands == [Command("status", [], "status")]
 
@@ -213,20 +213,43 @@ def test_addressed_fallback_not_used_when_a_line_matches():
     assert len(r.items) == 1
 
 
-def test_addressed_unknown_text_is_parse_error():
-    r = parse_message("make the button orange", addressed=True)
-    assert len(r.items) == 1
-    assert isinstance(r.items[0], ParseError)
+def test_addressed_unknown_text_is_ignored():
+    assert parse_message("make the button orange", addressed=True).items == []
+    assert parse_message("please open notes", addressed=True).items == []
 
 
-def test_addressed_empty_body():
-    r = parse_message("", addressed=True)
+def test_addressed_empty_body_ignored():
+    assert parse_message("", addressed=True).items == []
+
+
+def test_addressed_only_mentions_ignored():
+    assert parse_message("@hands", addressed=True).items == []
+
+
+def test_ignition_sentence_is_prose():
+    body = "Room service. Tonight we ship the Volt waitlist page."
+    assert parse_message(body, addressed=True).items == []
+    assert parse_message(body, addressed=False).items == []
+
+
+def test_concierge_plan_is_prose():
+    body = (
+        "Plan:\n1. @hands status\n2. @builder inspect the repo\n"
+        "3. @hands shot page http://localhost:3000"
+    )
+    assert parse_message(body, addressed=True).items == []
+
+
+def test_explicit_hands_unknown_verb_still_refused():
+    r = parse_message("@hands frobnicate", addressed=True)
     assert len(r.items) == 1 and isinstance(r.items[0], ParseError)
 
 
-def test_addressed_only_mentions():
-    r = parse_message("@hands", addressed=True)
-    assert len(r.items) == 1 and isinstance(r.items[0], ParseError)
+def test_hands_status_and_bare_status_work():
+    assert parse_message("@hands status").commands == [Command("status", [], "status")]
+    r = parse_message("@hands status", addressed=True)
+    assert [c.verb for c in r.commands] == ["status"]
+    assert parse_message("status", addressed=True).commands == [Command("status", [], "status")]
 
 
 def test_empty_unaddressed():
