@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RoomService · Mission Control</title>
+    <title>RoomService · Control Room</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,13 +15,13 @@
   <body>
     <div id="app">
       <header id="top">
-        <div class="word"><b>RoomService</b><span>Mission Control</span></div>
-        <div id="mission">no mission</div>
+        <div class="word"><b>RoomService</b><span>Control Room</span></div>
+        <div id="mission">no task</div>
         <div class="right">
           <span id="timer">00:00:00</span>
           <span class="conn" id="c-switch"><i></i>switch</span>
           <span class="conn" id="c-n8n"><i></i>n8n</span>
-          <span class="conn" id="c-hands"><i></i>hands</span>
+          <span class="conn" id="c-hands"><i></i>computer</span>
         </div>
       </header>
 
@@ -54,15 +54,15 @@
       </aside>
 
       <footer id="strip">
-        <span class="label">Hands</span>
+        <span class="label">Computer</span>
         <div id="chips"></div>
-        <span class="keys">F full · M mute · S freeze · C captions</span>
+        <span class="keys">F full · M mute · S pause · C captions</span>
       </footer>
     </div>
 
     <div id="flash"></div>
     <div id="transfer" hidden></div>
-    <div id="freeze" hidden>Frozen · the desk is not executing · press S to release</div>
+    <div id="freeze" hidden>Paused · the computer is not executing · press S to resume</div>
     <div id="pill" hidden>reconnecting…</div>
 
     <script type="module" src="/static/hud.js"></script>

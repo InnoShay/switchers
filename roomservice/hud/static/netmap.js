@@ -7,12 +7,12 @@ const VB = { w: 1280, h: 720 };
 const NODES = {
   you: [40, 300, 200, 110, "Owner", "Telegram · Mattermost", "human"],
   switch: [440, 235, 280, 240, "Switch", "rooms · roles · approvals", "hub"],
-  concierge: [880, 30, 200, 84, "Concierge", "Console agent", "agent"],
+  concierge: [880, 30, 200, 84, "Planner", "concierge", "agent"],
   builder: [880, 134, 200, 84, "Builder", "Console agent", "agent"],
-  scout: [880, 238, 200, 84, "Scout", "Console agent", "agent"],
-  life: [880, 342, 200, 84, "Life", "runtime agent", "agent"],
-  hands: [880, 446, 200, 104, "Hands", "desk-laptop", "agent"],
-  backup: [880, 570, 200, 84, "Hands · backup", "desk-backup · standby", "agent"],
+  scout: [880, 238, 200, 84, "Researcher", "scout", "agent"],
+  life: [880, 342, 200, 84, "Assistant", "life", "agent"],
+  hands: [880, 446, 200, 104, "Computer", "desk-laptop", "agent"],
+  backup: [880, 570, 200, 84, "Backup computer", "desk-backup · standby", "agent"],
   n8n: [1130, 342, 120, 84, "n8n", "calendar · mail", "ext"],
   machine: [1130, 446, 120, 104, "Laptop", "macOS", "ext"],
 };
@@ -83,7 +83,7 @@ export class NetMap {
       const badge = el("g", { class: "badge", transform: `translate(${w - 78},${h - 30})` }, g);
       el("rect", { width: 64, height: 20, rx: 3 }, badge);
       const bt = el("text", { x: 32, y: 14, "text-anchor": "middle" }, badge);
-      bt.textContent = "HANDS";
+      bt.textContent = "ACTING";
       this.nodes[id] = { id, g, w, h, x, y, label: t, sub: s, st, badge, state: "idle" };
     }
     this.nodes.hands.badge.classList.add("on");
@@ -91,8 +91,8 @@ export class NetMap {
     // switch hub: the rooms it is holding right now
     const hub = this.nodes.switch.g;
     const rooms = el("g", { class: "rooms", transform: "translate(16,84)" }, hub);
-    this.roomHq = this.room(rooms, 0, "HQ", "RoomService HQ");
-    this.roomMission = this.room(rooms, 62, "MISSION", "none");
+    this.roomHq = this.room(rooms, 0, "MAIN", "Main chat");
+    this.roomMission = this.room(rooms, 62, "TASK", "none");
     const bridge = el("text", { class: "node-sub", x: 16, y: 228 }, hub);
     bridge.textContent = "bridges: telegram · mattermost";
 
@@ -100,7 +100,7 @@ export class NetMap {
     const m = this.nodes.machine.g;
     this.act = el("text", { class: "node-act", x: 14, y: 78 }, m);
     this.actBar = el("rect", { class: "node-bar", x: 14, y: 90, width: 0, height: 3 }, m);
-    this.roomHq.v.textContent = "RoomService HQ";
+    this.roomHq.v.textContent = "Main chat";
   }
 
   room(parent, y, tag, name) {
@@ -133,7 +133,7 @@ export class NetMap {
   }
 
   setMission(slug) {
-    this.roomMission.v.textContent = slug ? `mission-${slug}` : "none";
+    this.roomMission.v.textContent = slug ? `task-${slug}` : "none";
     this.roomMission.g.classList.toggle("live", !!slug);
   }
 
@@ -157,7 +157,7 @@ export class NetMap {
     this.nodes.hands.badge.classList.toggle("on", toNode === "hands");
     this.nodes.backup.badge.classList.toggle("on", toNode === "backup");
     this.nodes.hands.sub.textContent = toNode === "hands" ? "desk-laptop" : "desk-laptop · released";
-    this.nodes.backup.sub.textContent = toNode === "backup" ? "desk-backup · holds hands" : "desk-backup · standby";
+    this.nodes.backup.sub.textContent = toNode === "backup" ? "desk-backup · acting" : "desk-backup · standby";
   }
 
   ignite() {
