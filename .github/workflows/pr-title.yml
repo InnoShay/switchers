@@ -1,0 +1,11 @@
+name: pr-title
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - env: {TITLE: "${{ github.event.pull_request.title }}"}
+        run: |
+          echo "$TITLE" | grep -Eq '^RS-[0-9]{2}: .{5,}$' || { echo "PR title must be 'RS-NN: <title>'"; exit 1; }
