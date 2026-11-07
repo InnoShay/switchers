@@ -7,74 +7,62 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/hud.css" />
   </head>
   <body>
-    <div id="grid"></div>
-    <div id="vignette"></div>
-
     <div id="app">
       <header id="top">
-        <div class="brand">ROOMSERVICE <span class="sep">▪</span> <span id="mission">no mission</span></div>
-        <div id="timer" title="mission time">⏱ 00:00:00</div>
-        <div class="conns">
+        <div class="word"><b>RoomService</b><span>Mission Control</span></div>
+        <div id="mission">no mission</div>
+        <div class="right">
+          <span id="timer">00:00:00</span>
           <span class="conn" id="c-switch"><i></i>switch</span>
           <span class="conn" id="c-n8n"><i></i>n8n</span>
           <span class="conn" id="c-hands"><i></i>hands</span>
         </div>
       </header>
 
-      <aside id="crew">
-        <h2>CREW</h2>
-        <ul id="crew-list"></ul>
-        <div id="machine"></div>
-      </aside>
-
       <main id="stage">
-        <canvas id="orb"></canvas>
-        <div id="caption"></div>
+        <svg id="map" role="img" aria-label="Live map of the Switch room: owner, Switch, agents and the desk"></svg>
+        <p id="demo-caption" hidden></p>
+        <div id="voice"><span>VOICE</span><h1 id="caption" aria-live="polite"></h1></div>
         <div id="ignite-text">ROOM SERVICE ONLINE</div>
+
+        <div id="approval" hidden>
+          <div class="panel">
+            <div id="ap-title">APPROVAL NEEDED</div>
+            <div id="ap-code">----</div>
+            <div id="ap-cmd"></div>
+            <div class="bar"><i id="ap-bar"></i></div>
+            <div id="ap-left"></div>
+            <div id="ap-hint">reply <b>ok CODE</b> or <b>no CODE</b> from your phone</div>
+          </div>
+        </div>
+
+        <figure id="toast" hidden>
+          <img id="toast-img" alt="screenshot from the desk" />
+          <figcaption id="toast-cap"></figcaption>
+        </figure>
       </main>
 
-      <aside id="feed">
-        <h2>FEED</h2>
+      <aside id="feed" aria-label="Activity">
+        <h2>Activity</h2>
         <ol id="feed-list"></ol>
       </aside>
 
       <footer id="strip">
-        <span class="label">HANDS ▸</span>
+        <span class="label">Hands</span>
         <div id="chips"></div>
         <span class="keys">F full · M mute · S freeze · C captions</span>
       </footer>
     </div>
 
     <div id="flash"></div>
-    <div id="scan"></div>
-
-    <div id="approval" hidden>
-      <div class="card">
-        <svg viewBox="0 0 120 120" class="ring">
-          <circle cx="60" cy="60" r="54" class="ring-bg" />
-          <circle cx="60" cy="60" r="54" class="ring-fg" id="ring-fg" />
-        </svg>
-        <div class="kicker">APPROVAL NEEDED</div>
-        <div id="ap-code">----</div>
-        <div id="ap-cmd"></div>
-        <div id="ap-left"></div>
-        <div id="ap-hint">reply <b>ok CODE</b> or <b>no CODE</b> from your phone</div>
-      </div>
-    </div>
-
-    <div id="toast" hidden>
-      <img id="toast-img" alt="screenshot" />
-      <div id="toast-cap"></div>
-    </div>
     <div id="transfer" hidden></div>
-    <div id="freeze" hidden>FROZEN · desk is not executing · press S to unfreeze</div>
-    <div id="demo-caption" hidden></div>
+    <div id="freeze" hidden>Frozen · the desk is not executing · press S to release</div>
     <div id="pill" hidden>reconnecting…</div>
 
     <script type="module" src="/static/hud.js"></script>

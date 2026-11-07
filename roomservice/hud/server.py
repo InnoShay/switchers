@@ -103,6 +103,6 @@ app = create_app()
 async def run_hud(port: int) -> None:
     """Serve the HUD inside the runtime's event loop (SPEC §24.2 RS-08)."""
     server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", ws="websockets")
+        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", ws="auto")
     )
     await server.serve()

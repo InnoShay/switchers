@@ -1,39 +1,32 @@
-// Mission Control HUD frontend (SPEC §16). Plain ES modules, no build step.
+// Mission Control HUD frontend (SPEC §16): the live Switch network map. Plain ES modules, no build step.
 // Every piece of chat text is written with textContent, never innerHTML.
-import { Orb } from "./orb.js";
+import { NetMap } from "./netmap.js";
 import { Sfx } from "./sfx.js";
 
-const COLORS = {
-  you: "#F5F7FA",
-  concierge: "#7C9CFF",
-  builder: "#FFB547",
-  scout: "#4FD1C5",
-  hands: "#FF5C7A",
-  life: "#9BE564",
-};
 const NAMES = { you: "You", concierge: "Concierge", builder: "Builder", scout: "Scout", hands: "Hands", life: "Life" };
-const CREW = Object.keys(COLORS);
+const CREW = ["you", "concierge", "builder", "scout", "hands", "life"];
 const FEED_MAX = 60;
 const CHIPS_MAX = 8;
 const STALE_MS = 10 * 60 * 1000;
 const MENTION = /@(concierge|builder|scout|life|hands|desk-laptop|desk-backup)\b/gi;
 
 const $ = (id) => document.getElementById(id);
-const orb = new Orb($("orb"));
 const sfx = new Sfx();
 
 const S = {
   crew: Object.fromEntries(CREW.map((k) => [k, "idle"])),
-  active: {}, // agent -> last activity ms (for the 10-minute stale rule)
+  active: {},
   mission: null,
   startedAt: 0,
   conn: { switch: false, n8n: false },
   machine: "",
   frozen: false,
-  actions: new Map(), // id -> {verb, args, chip}
-  approvals: new Map(), // code -> {cmd, openedAt, expiresAt, chip}
+  actions: new Map(),
+  approvals: new Map(),
   captions: new URLSearchParams(location.search).has("captions"),
 };
+
+const map = new NetMap($("map"));
 
 // ---------- helpers ----------
 const hhmm = (ts) =>
@@ -44,6 +37,17 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
+// receipts carry emoji (SPEC §11); the HUD shows plain markers instead
+const plain = (t) =>
+  t
+    .replace(/✅\s*/g, "✓ ")
+    .replace(/⚠️\s*/g, "! ")
+    .replace(/🚫\s*/g, "✗ ")
+    .replace(/⌛\s*/g, "… ")
+    .replace(/🔊\s*/g, "voice · ")
+    .replace(/📸\s*/g, "shot · ")
+    .replace(/🫱\s*/g, "role · ")
+    .replace(/[⚡🧊▶]\s*/gu, "");
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 // ---------- crew + header ----------
@@ -51,20 +55,13 @@ function setState(agent, state) {
   if (!(agent in S.crew)) return;
   S.crew[agent] = state;
   if (state === "working") S.active[agent] = Date.now();
+  map.setState(agent, state);
   renderCrew();
   renderHeader();
 }
 
 function renderCrew() {
-  const ul = $("crew-list");
-  ul.textContent = "";
-  for (const k of CREW) {
-    const li = el("li", `s-${S.crew[k]}`);
-    li.style.setProperty("--c", COLORS[k]);
-    li.append(el("span", "dot"), el("span", "", NAMES[k]), el("span", "state", S.crew[k].replace("_", " ")));
-    ul.append(li);
-  }
-  $("machine").textContent = S.machine ? `machine · ${S.machine}` : "";
+  map.setMachine(S.machine);
 }
 
 function renderHeader() {
@@ -81,22 +78,21 @@ function tickTimer() {
     const p = (n) => String(n).padStart(2, "0");
     t = `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
   }
-  $("timer").textContent = `⏱ ${t}`;
+  $("timer").textContent = t;
 }
 
 // ---------- feed ----------
 function feed(ts, who, text, cls) {
   const li = el("li", cls || "");
   li.append(el("span", "t", hhmm(ts)));
-  const w = el("span", "who", who);
-  w.style.setProperty("--c", COLORS[who.toLowerCase()] || "#8892a6");
-  li.append(w, document.createTextNode(clip(text, 160)));
+    const w = el("span", "who", who);
+  li.append(w, document.createTextNode(clip(plain(text), 160)));
   const list = $("feed-list");
   list.prepend(li);
   while (list.children.length > FEED_MAX) list.lastChild.remove();
 }
 
-// ---------- hands strip ----------
+// ---------- hands ledger ----------
 function addChip(text, cls) {
   const chip = el("span", `chip ${cls || ""}`, text);
   const box = $("chips");
@@ -110,7 +106,7 @@ let toastTimer, transferTimer, captionTimer, speakTimer, resultTimer;
 
 function showToast(url, caption) {
   $("toast-img").src = url;
-  $("toast-cap").textContent = caption;
+  $("toast-cap").textContent = plain(caption);
   $("toast").hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => ($("toast").hidden = true), 6000);
@@ -124,6 +120,11 @@ function showTransfer(from, to) {
   clearTimeout(transferTimer);
   transferTimer = setTimeout(() => (b.hidden = true), 4000);
 }
+
+const fmtLeft = (ms) => {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 function renderApproval() {
   const box = $("approval");
@@ -139,14 +140,9 @@ function renderApproval() {
   const left = Math.max(0, a.expiresAt - Date.now());
   const total = Math.max(1, a.expiresAt - a.openedAt);
   $("ap-left").textContent = `expires in ${fmtLeft(left)}`;
-  $("ring-fg").style.strokeDashoffset = String(339.3 * (1 - left / total));
+  $("ap-bar").style.transform = `scaleX(${left / total})`;
   box.hidden = false;
 }
-
-const fmtLeft = (ms) => {
-  const s = Math.ceil(ms / 1000);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
 
 function tickApprovals() {
   for (const [code, a] of S.approvals) {
@@ -157,25 +153,24 @@ function tickApprovals() {
 
 function approvalResult(ev, a) {
   const box = $("approval");
-  const good = ev.result === "ok";
   $("ap-code").textContent = ev.code;
   $("ap-cmd").textContent = a ? clip(a.cmd, 120) : "";
-  box.querySelector(".kicker").textContent =
+  $("ap-title").textContent =
     ev.result === "ok" ? `APPROVED${ev.by ? " BY " + ev.by.toUpperCase() : ""}` : ev.result === "no" ? "DECLINED" : "EXPIRED";
   $("ap-left").textContent = "";
   box.classList.add("result");
-  box.classList.toggle("bad", !good);
   box.hidden = false;
   clearTimeout(resultTimer);
   resultTimer = setTimeout(() => {
-    box.classList.remove("result", "bad");
-    box.querySelector(".kicker").textContent = "APPROVAL NEEDED";
+    box.classList.remove("result");
+    $("ap-title").textContent = "APPROVAL NEEDED";
     renderApproval();
   }, 1500);
 }
 
 function showFreeze(on) {
   S.frozen = on;
+  map.setFrozen(on);
   $("freeze").hidden = !on;
 }
 
@@ -185,7 +180,7 @@ function demoCaption(text) {
   c.textContent = text;
   c.hidden = false;
   clearTimeout(captionTimer);
-  captionTimer = setTimeout(() => (c.hidden = true), 3500);
+  captionTimer = setTimeout(() => (c.hidden = true), 3800);
 }
 
 function say(text) {
@@ -193,25 +188,22 @@ function say(text) {
   c.textContent = text;
   c.style.opacity = "1";
   clearTimeout(speakTimer);
-  speakTimer = setTimeout(() => (c.style.opacity = "0.35"), 9000);
+  speakTimer = setTimeout(() => (c.style.opacity = "0.18"), 9000);
 }
 
 function ignition(flash) {
-  document.body.classList.add("igniting");
-  const reflow = (n) => {
+  const reflow = (n, cls) => {
     n.classList.remove("go", "out");
     void n.offsetWidth;
-    n.classList.add("go");
+    n.classList.add(cls || "go");
   };
   if (flash) reflow($("flash"));
-  reflow($("scan"));
+  map.ignite();
   const t = $("ignite-text");
   t.classList.remove("out");
   reflow(t);
-  orb.ignite(700);
   sfx.ignition();
-  setTimeout(() => t.classList.add("out"), 2600);
-  setTimeout(() => document.body.classList.remove("igniting"), 2000);
+  setTimeout(() => t.classList.add("out"), 2800);
 }
 
 // ---------- event handling ----------
@@ -224,17 +216,20 @@ function mentionedAgents(body) {
   return out;
 }
 
-function runningActions() {
-  return S.actions.size > 0;
-}
+const runningActions = () => S.actions.size > 0;
 
 function handle(ev) {
   switch (ev.type) {
     case "hello": {
-      // Spec: all crew start idle after hello, so "offline" from the bus snapshot reads as idle.
-      for (const m of ev.crew) S.crew[m.name] = m.state === "offline" ? "idle" : m.state;
+      // Spec §16.3: all crew start idle after hello, so "offline" from the snapshot reads as idle.
+      for (const m of ev.crew) {
+        S.crew[m.name] = m.state === "offline" ? "idle" : m.state;
+        map.setState(m.name, S.crew[m.name]);
+      }
       S.mission = ev.mission;
       S.conn = ev.connections;
+      map.setMission(ev.mission);
+      map.setHolder(ev.machine === "backup" ? "desk-backup" : "desk-laptop");
       S.machine = ev.machine;
       if (!ev.mission) S.startedAt = 0;
       renderCrew();
@@ -244,22 +239,24 @@ function handle(ev) {
     case "ignition":
       ignition(ev.lights === "flash");
       feed(ev.ts, "system", `⚡ ignition · booting ${ev.project}`);
-      demoCaption("Ignition: one sentence wakes the room before any LLM answers");
+      demoCaption("Ignition: one sentence wakes the room before any model answers");
       break;
     case "mission":
       S.mission = ev.slug;
       S.startedAt = ev.started_at;
+      map.setMission(ev.slug);
       renderHeader();
       feed(ev.ts, "system", `mission ${ev.slug}${ev.title ? " · " + ev.title : ""}`);
       demoCaption("A mission room is spawned from a Switch template");
       break;
     case "message": {
-      const who = ev.agent in COLORS ? ev.agent : "other";
-      orb.flash(COLORS[who] || "#8892a6");
+      const who = ev.agent in S.crew ? ev.agent : null;
+      const targets = [...mentionedAgents(ev.body)].filter((a) => a !== ev.agent);
+      map.message(who || "other", targets, ev.body);
       sfx.message();
-      feed(ev.ts, who === "other" ? ev.sender_name : NAMES[who], ev.body);
-      if (ev.agent in S.crew && !(ev.agent === "hands" && runningActions())) setState(ev.agent, "idle");
-      for (const a of mentionedAgents(ev.body)) if (a !== ev.agent) setState(a, "working");
+      feed(ev.ts, who ? NAMES[who] : ev.sender_name, ev.body);
+      if (who && !(who === "hands" && runningActions())) setState(who, "idle");
+      for (const a of targets) setState(a, "working");
       break;
     }
     case "agent_state":
@@ -269,7 +266,7 @@ function handle(ev) {
       const chip = addChip(`${ev.verb} ${ev.args.join(" ")}`.trim() + " …", "run");
       S.actions.set(ev.id, { verb: ev.verb, args: ev.args, chip });
       setState("hands", "working");
-      orb.arc = true;
+      map.actionStart(ev.verb, ev.args);
       break;
     }
     case "action_end": {
@@ -279,14 +276,14 @@ function handle(ev) {
       const secs = (ev.ms / 1000).toFixed(1);
       if (a) {
         a.chip.className = `chip ${ev.ok ? "" : "fail"}`;
-        a.chip.textContent = `${label} ${ev.ok ? "" : "✗ "}${secs}s`;
+        a.chip.textContent = `${label} · ${secs}s`;
       } else {
-        addChip(`${label} ${secs}s`, ev.ok ? "" : "fail");
+        addChip(`${label} · ${secs}s`, ev.ok ? "" : "fail");
       }
       feed(ev.ts, "hands", `${ev.ok ? "✅" : "⚠️"} ${label} · ${ev.summary} · ${secs}s`, ev.ok ? "" : "warn");
       if (!runningActions()) {
         setState("hands", "idle");
-        orb.arc = false;
+        map.actionEnd(ev.ok);
       }
       break;
     }
@@ -294,11 +291,12 @@ function handle(ev) {
       const chip = addChip(`${clip(ev.cmd, 22)} ⚠ ${ev.code}`, "appr");
       S.approvals.set(ev.code, { cmd: ev.cmd, openedAt: ev.ts, expiresAt: ev.expires_at, chip });
       setState("you", "needs_you");
-      orb.approval = true;
+      map.setWaiting(true);
+      map.flow(["hands", "switch", "you"], "ask", `approval ${ev.code}`);
       sfx.approval();
       feed(ev.ts, "system", `⚠️ approval needed · ${ev.cmd} · ${ev.code}`, "warn");
       renderApproval();
-      demoCaption("Risky step: the owner approves from the phone with a code");
+      demoCaption("A risky step waits for the owner. Autonomy with a leash.");
       break;
     }
     case "approval_closed": {
@@ -310,13 +308,19 @@ function handle(ev) {
       }
       if (S.approvals.size === 0) {
         setState("you", "idle");
-        orb.approval = false;
+        map.setWaiting(false);
       }
-      feed(ev.ts, "system", `${ev.result === "ok" ? "✅ approved" : ev.result === "no" ? "🚫 declined" : "⌛ expired"} · ${ev.code}${ev.by ? " · " + ev.by : ""}`);
+      feed(
+        ev.ts,
+        "system",
+        `${ev.result === "ok" ? "✅ approved" : ev.result === "no" ? "🚫 declined" : "⌛ expired"} · ${ev.code}${ev.by ? " · " + ev.by : ""}`,
+      );
+      map.flow(["you", "switch", "hands"], ev.result === "ok" ? "ok" : "err", `${ev.result} ${ev.code}`);
       approvalResult(ev, a);
       break;
     }
     case "screenshot":
+      map.flow(["hands", "switch", "you"], "img", "screenshot");
       showToast(ev.url, ev.caption);
       sfx.shutter();
       feed(ev.ts, "hands", ev.caption);
@@ -328,9 +332,11 @@ function handle(ev) {
       break;
     case "transfer":
       showTransfer(ev.from_agent, ev.to_agent);
+      map.flow(["hands", "switch", "backup"], "role", "role: hands", 600);
+      setTimeout(() => map.setHolder(ev.to_agent), 1000);
       sfx.whoosh();
       feed(ev.ts, "hands", `🫱 hands transferred ${ev.from_agent} → ${ev.to_agent}`);
-      demoCaption("Hands is a role: it moves to another machine");
+      demoCaption("Hands is a role. It moves to another machine.");
       break;
     case "freeze":
       showFreeze(ev.on);
