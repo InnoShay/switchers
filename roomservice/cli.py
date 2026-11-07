@@ -68,16 +68,6 @@ async def _register_all(names: list[str], overwrite: bool) -> list[str]:
                 console.print(f"[red]{name}: {e}[/red]")
                 continue
             store.save_agent_creds(url, name, agent_id, key)
-            agent_http = SwitchHTTPClient(url, agent_id=agent_id, api_key=key)
-            try:
-                await agent_http.op(
-                    "update_agent_detail",
-                    {"agent_id": agent_id, "addressing": "owner_and_owner_agents"},
-                )
-            except OpError as e:
-                console.print(f"[yellow]{name}: could not set addressing ({e})[/yellow]")
-            finally:
-                await agent_http.aclose()
             console.print(f"[green]registered[/green] {name} (id {agent_id}; key saved, not shown)")
             done.append(name)
     finally:

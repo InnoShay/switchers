@@ -148,9 +148,6 @@ async def s2(settings: Settings, seconds: float = 30) -> None:
 
     http = SwitchHTTPClient(url, agent_id=agent_id, api_key=key)
     try:
-        await http.op(
-            "update_agent_detail", {"agent_id": agent_id, "addressing": "owner_and_owner_agents"}
-        )
         rooms = await _list_rooms(http, settings)
         if not rooms:
             raise SpikeFailed(
@@ -223,19 +220,26 @@ async def s4(settings: Settings, seconds: float = 180) -> None:
     _steps("S4 mission template", [
         "Start the desk (`uv run roomservice up`) if RS-07 is merged; otherwise skip.",
         "In Mattermost roomservice-hq say: test mission spike room",
-        f"Waiting up to {seconds:.0f}s for a room named mission-spike-room ...",
+        f"Waiting up to {seconds:.0f}s for a room named mission-*spike-room ...",
     ])  # fmt: skip
     http, _, _ = _client(settings, settings.roomservice_agent, SPIKE_AGENT)
     try:
         end = time.monotonic() + seconds
         while time.monotonic() < end:
             rooms = await _list_rooms(http, settings)
-            hit = next((r for r in rooms if r.name == "mission-spike-room"), None)
+            hit = next(
+                (
+                    r
+                    for r in rooms
+                    if r.name.startswith("mission-") and r.name.endswith("spike-room")
+                ),
+                None,
+            )
             if hit:
                 _ok(f"room '{hit.name}' exists (id {hit.id}). Check crew, brief doc and kickoff.")
                 return
             await asyncio.sleep(2)
-        raise SpikeFailed("no mission-spike-room; use the concierge fallback path (SPEC §10.4)")
+        raise SpikeFailed("no mission-*spike-room; use the concierge fallback path (SPEC §10.4)")
     finally:
         await http.aclose()
 
@@ -281,6 +285,10 @@ async def s6(settings: Settings, seconds: float = 60) -> None:
     http, _, _ = _client(settings, settings.roomservice_agent, SPIKE_AGENT)
     try:
         before = {r.id for r in await _list_rooms(http, settings)}
+        console.print(
+            "Hand-made rooms are visible only once rs-spike is invited: create the room, "
+            "then send `!invite-agent @rs-spike` in it."
+        )
         await asyncio.to_thread(input, "Press Enter, then create a new room right away... ")
         t0 = time.monotonic()
         while time.monotonic() - t0 < seconds:
