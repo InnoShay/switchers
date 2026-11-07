@@ -41,9 +41,8 @@ room:
   agents: [concierge, builder, scout, desk-laptop, life]
   users: ["{$creator}"]
   aliases:
-    planner: concierge
-    researcher: scout
-    computer: desk-laptop
-    assistant: life
-    backup: desk-backup
+    concierge: planner
+    scout: researcher
+    desk-laptop: computer
+    life: assistant
 kickoff: "@concierge introduce the team in three short lines and say you're ready for a task."

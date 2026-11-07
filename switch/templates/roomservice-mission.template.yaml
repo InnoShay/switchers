@@ -14,11 +14,10 @@ room:
   agents: [concierge, builder, scout, desk-laptop, life]
   users: ["{$creator}"]
   aliases:
-    planner: concierge
-    researcher: scout
-    computer: desk-laptop
-    assistant: life
-    backup: desk-backup
+    concierge: planner
+    scout: researcher
+    desk-laptop: computer
+    life: assistant
   roles:
     - name: hands
       exclusive: true
