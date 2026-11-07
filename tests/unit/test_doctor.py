@@ -283,18 +283,24 @@ async def test_code_on_path(settings, desk_yaml, monkeypatch):
     assert not r.ok and "Shell Command" in r.hint
 
 
-async def test_chrome_and_spotify_mac_and_linux(settings, desk_yaml, monkeypatch):
+async def test_browser_and_spotify_mac_and_linux(settings, desk_yaml, monkeypatch):
     d = doc.Doctor(settings, desk_yaml)
     monkeypatch.setattr(doc.platform, "system", lambda: "Darwin")
     monkeypatch.setattr(doc, "mac_app_installed", lambda n: n == "Google Chrome")
     r = await d.apps_installed()
-    assert not r.ok and "Spotify" in r.detail and "Chrome" not in r.detail.replace("Google ", "")
+    assert not r.ok and "Spotify" in r.detail and "browser" not in r.detail
+    monkeypatch.setattr(doc, "mac_app_installed", lambda n: n in ("Brave Browser", "Spotify"))
+    assert (await d.apps_installed()).ok  # any browser counts, e.g. Brave
     monkeypatch.setattr(doc, "mac_app_installed", lambda n: True)
     assert (await d.apps_installed()).ok
     monkeypatch.setattr(doc.platform, "system", lambda: "Linux")
     monkeypatch.setattr(doc.shutil, "which", lambda n: "/x" if n == "spotify" else None)
     r = await d.apps_installed()
-    assert not r.ok and "Chrome" in r.detail
+    assert not r.ok and "browser" in r.detail
+    monkeypatch.setattr(
+        doc.shutil, "which", lambda n: "/x" if n in ("spotify", "brave-browser") else None
+    )
+    assert (await d.apps_installed()).ok
 
 
 @pytest.mark.parametrize(

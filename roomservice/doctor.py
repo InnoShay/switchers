@@ -55,6 +55,12 @@ def non_dark_fraction(png: bytes, threshold: int = 40) -> float:
     return lit / max(1, total)
 
 
+MAC_BROWSERS = ("Google Chrome", "Brave Browser", "Microsoft Edge", "Chromium", "Arc", "Safari")
+LINUX_BROWSERS = (
+    "google-chrome", "chrome", "brave-browser", "brave", "chromium", "microsoft-edge", "firefox",
+)  # fmt: skip
+
+
 def mac_app_installed(name: str) -> bool:
     return any(
         (Path(base) / f"{name}.app").exists()
@@ -220,23 +226,21 @@ class Doctor:
     async def apps_installed(self) -> CheckResult:
         sysname = platform.system()
         if sysname == "Darwin":
-            missing = [a for a in ("Google Chrome", "Spotify") if not mac_app_installed(a)]
+            have_browser = any(mac_app_installed(a) for a in MAC_BROWSERS)
+            have_spotify = mac_app_installed("Spotify")
         else:
-            missing = [
-                name
-                for name, bins in (
-                    ("Chrome", ("google-chrome", "chrome")),
-                    ("Spotify", ("spotify",)),
-                )
-                if not any(shutil.which(x) for x in bins)
-            ]
+            have_browser = any(shutil.which(x) for x in LINUX_BROWSERS)
+            have_spotify = bool(shutil.which("spotify"))
+        missing = [
+            n for n, ok in (("a browser", have_browser), ("Spotify", have_spotify)) if not ok
+        ]
         if missing:
             return _bad(
-                "Chrome / Spotify",
+                "Browser / Spotify",
                 f"missing: {', '.join(missing)}",
                 "Install them (music step and HUD window need them)",
             )
-        return _ok("Chrome / Spotify")
+        return _ok("Browser / Spotify")
 
     async def screen_recording(self) -> CheckResult:
         from roomservice.desk.os import get_adapter
