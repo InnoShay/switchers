@@ -1,6 +1,7 @@
 """typer CLI (SPEC §11.9). Commands are added by their tickets (RS-03, RS-07, ...)."""
 
 import asyncio
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -130,8 +131,14 @@ def spike(which: str = typer.Argument(..., help="s0 .. s8")) -> None:
 def _load_cfg(settings):
     from roomservice.contracts.config import ConfigError, load_desk_config
 
+    path = settings.roomservice_desk_config
+    example = Path("config/desk.example.yaml")
+    if not path.exists() and path == Path("config/desk.yaml") and example.exists():
+        # Fresh clone: fall back to the shipped example so `up --dry-run` works (SPEC §26).
+        console.print("[yellow]config/desk.yaml not found; using config/desk.example.yaml[/yellow]")
+        path = example
     try:
-        return load_desk_config(settings.roomservice_desk_config)
+        return load_desk_config(path)
     except ConfigError as e:
         console.print(f"[red]desk.yaml: {e}[/red]")
         console.print("Fix: cp config/desk.example.yaml config/desk.yaml and edit the paths.")
