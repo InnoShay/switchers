@@ -113,9 +113,7 @@ class RoleOps:
         return True
 
 
-async def capture_page(url: str) -> bytes | None:
-    """Playwright page screenshot. RS-10 replaces this; None means "fall back to screen"."""
-    return None
+from roomservice.desk.pageshot import capture_page  # noqa: E402  (RS-10: Playwright page shot)
 
 
 def _plural(n: int, word: str) -> str:
