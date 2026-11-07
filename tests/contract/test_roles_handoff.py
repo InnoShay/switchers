@@ -116,7 +116,7 @@ async def test_mission_refused_when_another_agent_holds_hands(fixtures_dir, monk
     agent = make(DeskAgent, fixtures_dir, "desk-laptop")
     try:
         await agent.start()
-        await wait_for(lambda: "⛔ refused · hands is held by desk-backup" in bodies(fake))
+        await wait_for(lambda: "⛔ refused · the computer is busy with desk-backup" in bodies(fake))
         assert agent.role_room is None
     finally:
         await agent.stop()
@@ -158,7 +158,7 @@ async def test_lease_lapse_hands_over_to_backup_and_announces(fixtures_dir, monk
 
         await laptop.stop()  # runtime killed: no more renewals, role not released
         await wait_for(lambda: fake.roles.get("hands", {}).get("name") == "desk-backup", 6)
-        text = "🫱 hands is now on desk-backup"
+        text = "🫱 the backup computer took over"
         await wait_for(lambda: bodies(fake).count(text) >= 2)  # mission room + HQ
         assert backup.role_room.id == "room-2"
         await wait_for(lambda: any(e.type == "transfer" for e in events))
@@ -182,7 +182,7 @@ async def test_explicit_mode_only_moves_on_release(fixtures_dir, monkeypatch, tm
         assert not any("🫱" in b for b in bodies(fake))
         assert await laptop.release_hands()  # the owner's `@hands release`
         await wait_for(lambda: fake.roles.get("hands", {}).get("name") == "desk-backup", 6)
-        await wait_for(lambda: "🫱 hands is now on desk-backup" in bodies(fake))
+        await wait_for(lambda: "🫱 the backup computer took over" in bodies(fake))
     finally:
         await laptop.stop()
         await backup.stop()

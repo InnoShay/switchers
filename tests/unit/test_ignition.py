@@ -107,14 +107,14 @@ async def test_fire_order_and_effects(rig):
     assert isinstance(events[0], IgnitionEvent)  # HUD first
     assert (events[0].project, events[0].lights) == ("volt", "flash")
     assert log["spoken"] == ["Morning. Booting Volt."]
-    assert log["posts"] == [("roomservice-hq", "⚡ ignition · booting volt")]
+    assert log["posts"] == [("roomservice-hq", "⚡ waking up · opening volt")]
     assert log["queued"] == [("boot volt", "roomservice-hq")]
 
 
 async def test_default_profile_ignition(rig):
     ign, log, *_ = rig
     assert await ign.fire(HQ, msg("room service")) == "focus-session"
-    assert log["posts"][0][1] == "⚡ ignition · booting focus-session"
+    assert log["posts"][0][1] == "⚡ waking up · opening focus-session"
     assert log["spoken"] == ["Morning. Booting Focus Session."]
 
 

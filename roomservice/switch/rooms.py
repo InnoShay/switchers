@@ -28,11 +28,11 @@ _ACTIVITY_KEYS = (
 
 
 def detect_kind(room_id: str, name: str, hq_rooms: list[str]) -> RoomKind:
-    """hq if name or id is in ROOMSERVICE_HQ_ROOMS; mission if name starts with `mission-`."""
+    """hq if listed in ROOMSERVICE_HQ_ROOMS; mission if named `mission-*` or `task-*`."""
     hq = {h.strip().casefold() for h in hq_rooms}
     if room_id.casefold() in hq or name.strip().casefold() in hq:
         return RoomKind.HQ
-    if name.casefold().startswith("mission-"):
+    if name.casefold().startswith(("mission-", "task-")):
         return RoomKind.MISSION
     return RoomKind.OTHER
 

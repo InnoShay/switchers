@@ -31,7 +31,9 @@ GLOBAL_MAX = 30  # RS-10 safety valve: mirrors / 60 s across all missions, then 
 
 PERMISSION_RE = re.compile(r"Allow once|Allow for this session")
 DONE_RE = re.compile(r"\b(?:done|finished)\b", re.IGNORECASE)
-KICKOFF_RE = re.compile(r"@(?:desk\S*|hands)\b[^\n]*\bmission\s+\S+", re.IGNORECASE)
+KICKOFF_RE = re.compile(
+    r"@(?:desk\S*|hands|computer|backup)\b[^\n]*\b(?:mission|task)\s+\S+", re.IGNORECASE
+)
 WRAP_RE = re.compile(r"^✅ wrap · \S+ · (\d+) min")
 
 

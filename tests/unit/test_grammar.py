@@ -286,3 +286,26 @@ def test_max_commands_is_configurable():
     assert (
         r.refusal == too_many_commands_text(1) == "⛔ refused · more than 1 commands in one message"
     )
+
+
+# -- RS-07 plain words ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("who", ["@computer", "@backup", "@hands", "@desk-laptop", "@desk-backup"])
+def test_plain_and_old_mentions_address_the_desk(who):
+    r = parse_message(f"{who} status")
+    assert [(c.verb, c.args) for c in r.commands] == [("status", [])]
+
+
+def test_task_alias_for_mission():
+    c = cmd("task my-slug volt")
+    assert (c.verb, c.args) == ("mission", ["my-slug", "volt"])
+    assert cmd("mission my-slug volt").verb == "mission"
+
+
+@pytest.mark.parametrize(
+    ("word", "verb"),
+    [("pause", "freeze"), ("unpause", "unfreeze"), ("wake", "boot"), ("freeze", "freeze")],
+)
+def test_pause_unpause_wake_aliases(word, verb):
+    assert cmd(word).verb == verb

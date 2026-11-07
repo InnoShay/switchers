@@ -40,13 +40,13 @@ def test_refused_allowlist():
 def test_refused_variants():
     assert r.refused_too_many() == "⛔ refused · more than 5 commands in one message"
     assert r.refused_rate_limit() == "⛔ refused · rate limit (20/min)"
-    assert r.refused_frozen() == "⛔ refused · frozen by owner"
+    assert r.refused_frozen() == "⛔ refused · paused by owner"
 
 
 def test_didnt_understand():
     assert (
         r.didnt_understand("make it orange")
-        == '⛔ didn\'t understand · "make it orange" · try: @hands help'
+        == '⛔ didn\'t understand · "make it orange" · try: @computer help'
     )
 
 
@@ -92,12 +92,12 @@ def test_screenshot_caption_converts_to_ist():
 
 
 def test_ignition_hands_paired_freeze():
-    assert r.ignition("volt") == "⚡ ignition · booting volt"
-    assert r.ignition("focus-session") == "⚡ ignition · booting focus-session"
-    assert r.hands_now_on("desk-backup") == "🫱 hands is now on desk-backup"
+    assert r.ignition("volt") == "⚡ waking up · opening volt"
+    assert r.ignition("focus-session") == "⚡ waking up · opening focus-session"
+    assert r.hands_now_on("desk-backup") == "🫱 the backup computer took over"
     assert r.paired("Lakshay", "RoomService HQ") == "🔐 paired · Lakshay on RoomService HQ"
-    assert r.frozen("Lakshay") == "🧊 frozen by Lakshay"
-    assert r.unfrozen("Lakshay") == "🔥 unfrozen by Lakshay"
+    assert r.frozen("Lakshay") == "🧊 paused by Lakshay"
+    assert r.unfrozen("Lakshay") == "▶ resumed by Lakshay"
 
 
 def test_wrap_receipt_shape():
@@ -119,5 +119,12 @@ def test_resume_receipts():
 def test_mission_already_booted():
     assert (
         r.mission_already_booted("volt-waitlist")
-        == "✅ mission volt-waitlist · already booted · hands assumed"
+        == "✅ task volt-waitlist · already booted · computer assumed"
     )
+
+
+def test_rs07_plain_word_display_of_verbs():
+    assert r.ok("mission", ["a", "volt"], "done", 1.0).startswith("✅ task a volt")
+    assert r.fmt_cmd("freeze") == "pause"
+    assert r.fmt_cmd("unfreeze") == "unpause"
+    assert r.refused_held("desk-backup") == "⛔ refused · the computer is busy with desk-backup"

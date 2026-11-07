@@ -49,3 +49,13 @@ def test_recommend_mode_threshold():
     assert recommend_mode(15.0) == "lease"
     assert recommend_mode(15.1) == "explicit"
     assert recommend_mode(None) == "explicit"
+
+
+def test_rs07_task_prefix_is_a_task_room_and_old_prefix_still_works():
+    from roomservice.switch.rooms import detect_kind
+
+    assert detect_kind("x", "task-volt", ["roomservice-hq"]) == RoomKind.MISSION
+    assert detect_kind("x", "Task-Volt", []) == RoomKind.MISSION
+    assert detect_kind("x", "mission-volt", []) == RoomKind.MISSION
+    assert detect_kind("x", "roomservice-hq", ["roomservice-hq"]) == RoomKind.HQ
+    assert detect_kind("x", "random", []) == RoomKind.OTHER

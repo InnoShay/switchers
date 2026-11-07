@@ -15,9 +15,13 @@ def fmt_seconds(seconds: float) -> str:
     return f"{seconds:.1f}s"
 
 
+# Plain words shown to people; the canonical verbs stay frozen in the grammar.
+_DISPLAY_VERB = {"mission": "task", "freeze": "pause", "unfreeze": "unpause"}
+
+
 def fmt_cmd(verb: str, args: list[str] | tuple[str, ...] = ()) -> str:
     """`<verb> <args>`; an arg containing whitespace or quotes is shown in double quotes."""
-    parts = [verb]
+    parts = [_DISPLAY_VERB.get(verb, verb)]
     for a in args:
         needs_quotes = a == "" or any(c.isspace() or c in "\"'" for c in a)
         parts.append('"' + a.replace('"', '\\"') + '"' if needs_quotes else a)
@@ -42,8 +46,8 @@ def refused(raw: str, reason: str) -> str:
 
 
 def refused_held(holder: str) -> str:
-    """§15: `mission` while another agent holds the exclusive `hands` role."""
-    return f"⛔ refused · hands is held by {holder}"
+    """§15: `task` while another agent holds the exclusive `hands` role."""
+    return f"⛔ refused · the computer is busy with {holder}"
 
 
 def refused_rate_limit(limit: int = 20) -> str:
@@ -51,7 +55,7 @@ def refused_rate_limit(limit: int = 20) -> str:
 
 
 def refused_frozen() -> str:
-    return "⛔ refused · frozen by owner"
+    return "⛔ refused · paused by owner"
 
 
 def refused_too_many(limit: int = 5) -> str:
@@ -59,7 +63,7 @@ def refused_too_many(limit: int = 5) -> str:
 
 
 def didnt_understand(line: str) -> str:
-    return f'⛔ didn\'t understand · "{line}" · try: @hands help'
+    return f'⛔ didn\'t understand · "{line}" · try: @computer help'
 
 
 def approval_needed(cmd: str, project: str | None, code: str, ttl_s: int = 300) -> str:
@@ -96,11 +100,11 @@ def screenshot_caption(label: str, url: str | None, when: datetime) -> str:
 
 
 def ignition(target: str) -> str:
-    return f"⚡ ignition · booting {target}"
+    return f"⚡ waking up · opening {target}"
 
 
 def hands_now_on(agent_name: str) -> str:
-    return f"🫱 hands is now on {agent_name}"
+    return "🫱 the backup computer took over"
 
 
 def paired(sender_name: str, room_name: str) -> str:
@@ -108,11 +112,11 @@ def paired(sender_name: str, room_name: str) -> str:
 
 
 def frozen(name: str) -> str:
-    return f"🧊 frozen by {name}"
+    return f"🧊 paused by {name}"
 
 
 def unfrozen(name: str) -> str:
-    return f"🔥 unfrozen by {name}"
+    return f"▶ resumed by {name}"
 
 
 # -- verb-specific receipts quoted in §12.5, §12.8, §12.9 -------------------------------
@@ -131,4 +135,4 @@ def resume(project: str, summary: str, head: str | None = None, no_state: bool =
 
 
 def mission_already_booted(slug: str) -> str:
-    return f"✅ mission {slug} · already booted · hands assumed"
+    return f"✅ task {slug} · already booted · computer assumed"

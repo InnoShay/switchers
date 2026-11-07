@@ -21,7 +21,7 @@ POLL_S = 5.0
 
 
 def newest_mission(rooms: list[RoomInfo], raw_rooms: list[dict]) -> RoomInfo | None:
-    """The newest `mission-*` room: by activity timestamp, then by position in list_rooms."""
+    """The newest `mission-*` / `task-*` room: by activity, then list position."""
     by_id = {r.id: r for r in rooms if r.kind == RoomKind.MISSION}
     best: tuple[float, int, RoomInfo] | None = None
     for i, raw in enumerate(raw_rooms):

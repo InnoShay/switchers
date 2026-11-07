@@ -2,7 +2,7 @@
 
 Live incident: the relay mirrored a plan containing `@hands ...` into both HQ rooms, Switch
 auto-replied as the offline desk-laptop, the desk parsed that auto-reply as a command,
-answered `didn't understand ... try: @hands help`, which Switch auto-replied to again, forever.
+answered `didn't understand ... try: @computer help`, which Switch auto-replied to again, forever.
 """
 
 import asyncio

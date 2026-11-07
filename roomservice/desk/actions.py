@@ -45,13 +45,13 @@ GIT_TIMEOUT_S = 120
 
 HELP_TEXT = "\n".join(
     [
-        "@hands <verb> ... — one command per line, max 5",
-        "boot <project> · resume <project> · mission <slug> <project|none> · wrap",
+        "@computer <verb> ... — one command per line, max 5",
+        "boot <project> · resume <project> · task <name> <project|none> · wrap",
         "open <app> · close <app|all> · url <alias|https-url> · focus on|off",
         'shot [screen|page] · say "<text>" · lights on|off',
         'run <script> · commit "<msg>" · push   (asks for approval)',
         "status · help · release",
-        "owner only: ok|no <CODE> · freeze · unfreeze · pair <6 digits>",
+        "owner only: ok|no <CODE> · pause · unpause · pair <6 digits>",
     ]
 )
 
@@ -260,7 +260,7 @@ class DeskActions:
     def _need_project(self) -> tuple[str, Project]:
         proj = self.current_project()
         if proj is None:
-            raise Refuse("no active project (start a mission or boot one first)")
+            raise Refuse("no active project (start a task or boot one first)")
         return proj
 
     def _app(self, key: str) -> str:
@@ -473,10 +473,10 @@ class DeskActions:
 
     async def _v_mission(self, a: list[str], ctx: ActionContext) -> ActionResult:
         if len(a) != 2:
-            raise Refuse("usage: mission <slug> <project|none>")
+            raise Refuse("usage: task <name> <project|none>")
         slug, project = a[0], a[1]
         if not SLUG_RE.match(slug):
-            raise Refuse("invalid mission slug")
+            raise Refuse("invalid task name")
         if project.lower() == "none":
             project = ""
         elif project not in self.cfg.projects:
@@ -484,7 +484,7 @@ class DeskActions:
         ok, holder = await self.roles.assume_hands(ctx.room)
         if not ok:
             who = holder or "someone else"
-            return ActionResult(False, reason=f"hands is held by {who}",
+            return ActionResult(False, reason=f"the computer is busy with {who}",
                                 text=receipts.refused_held(who))  # fmt: skip
         p = self.cfg.projects[project] if project else None
         auto = self.state.start_mission(
@@ -501,19 +501,19 @@ class DeskActions:
             parts = (await self.boot(project)).summary
         else:
             parts = ""
-        self.speak(f"Mission {slug.replace('-', ' ')}. Hands on deck.")
+        self.speak(f"Task {slug.replace('-', ' ')}. On it.")
         self.bus.publish(MissionEvent(slug=slug, started_at=now_ms()))
         extra = f" · auto-wrapped {auto['slug']}" if auto else ""
         if parts is None:
             return ActionResult(True, text=receipts.mission_already_booted(slug) + extra)
-        summary = (parts + " · " if parts else "") + "hands assumed" + extra
+        summary = (parts + " · " if parts else "") + "computer assumed" + extra
         return ActionResult(True, summary=summary)
 
     async def _v_wrap(self, a: list[str], ctx: ActionContext) -> ActionResult:
         try:
             state = self.state.wrap()
         except NoActiveMission:
-            raise Refuse("no active mission") from None
+            raise Refuse("no active task") from None
         self._forget_opened()
         text = receipts.wrap(state["slug"], state["mission_minutes"], state)
         return ActionResult(True, text=text)
@@ -629,8 +629,8 @@ class DeskActions:
 
     async def _v_release(self, a: list[str], ctx: ActionContext) -> ActionResult:
         if not await self.roles.release_hands():
-            raise Refuse("hands is not held here")
-        return ActionResult(True, "hands released")
+            raise Refuse("the computer is not on the job here")
+        return ActionResult(True, "computer released")
 
     async def _v_help(self, a: list[str], ctx: ActionContext) -> ActionResult:
         return ActionResult(True, text=HELP_TEXT)
@@ -640,7 +640,7 @@ class DeskActions:
         proj = self.current_project()
         up_min = int((self.clock() - self.started) / 60)
         bits = [
-            f"mission {m.slug}" if m else "no mission",
+            f"task {m.slug}" if m else "no task",
             f"project {proj[0]} ({proj[1].path})" if proj else "no project",
         ]
         if proj and proj[1].screenshot_url:
@@ -649,8 +649,8 @@ class DeskActions:
             "apps: " + (", ".join(self.opened["apps"]) or "none"),
             f"up {up_min}m",
             f"queue {self.runtime.queue_len()}",
-            f"frozen {'yes' if self.runtime.frozen else 'no'}",
-            f"role hands: {'held' if self.runtime.role_held() else 'not held'}",
+            f"paused {'yes' if self.runtime.frozen else 'no'}",
+            f"computer on the job: {'yes' if self.runtime.role_held() else 'no'}",
         ]
         return ActionResult(True, summary=" · ".join(bits))
 

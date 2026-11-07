@@ -308,11 +308,11 @@ async def test_a14_hud_freeze_banner_then_commands_refused_until_unfreeze(desk):
     assert desk.frozen
     await say(desk, "@hands open browser")
     await say(desk, "@hands url github")
-    assert posts(desk)[-2:] == ["⛔ refused · frozen by owner"] * 2
+    assert posts(desk)[-2:] == ["⛔ refused · paused by owner"] * 2
     await say(desk, "@hands status")
     await say(desk, "@hands help")
     await desk.drain()
-    assert any(p.startswith("✅ status") and "frozen yes" in p for p in posts(desk))
+    assert any(p.startswith("✅ status") and "paused yes" in p for p in posts(desk))
     assert any("boot <project>" in p for p in posts(desk))
     assert ops(desk, "open_app") == [] and ops(desk, "open_url") == []
     await desk.bus.on_freeze(False)
@@ -330,7 +330,7 @@ async def test_frozen_desk_does_not_run_an_approved_commit(desk):
     await say(desk, f"ok {code}")
     await desk.drain()
     assert git_adds(desk) == []
-    assert posts(desk)[-1] == "⛔ refused · frozen by owner"
+    assert posts(desk)[-1] == "⛔ refused · paused by owner"
 
 
 # -- no shell ------------------------------------------------------------------------------
