@@ -51,3 +51,5 @@ RS-14: decision — A12 at the desk level: `close all` is not owner-only in §12
 RS-14: decision — chaos tests scale the 20 s Wi-Fi outage to 3 s (reconnect backoff caps at 10 s, same code path); the n8n-down check is skipped until `LifeAgent` exists (agents/life.py is empty on main). Manual §20.6 runs on the demo machine remain: restart Switch mid-mission, Wi-Fi off 20 s, `docker stop` n8n then ask Life something.
 RS-14: bug fix (test) — the chaos test asserted the macOS app name "Google Chrome"; the dry adapter resolves app targets per host OS, so on Linux CI it is `google-chrome`. The assertion now uses `agent.actions.app_target("browser")`, and the pre-outage state is awaited by condition, not by timing.
 RS-16: decision — ci runs on push to main as well as pull requests — SPEC §26 requires CI green on main and a test badge, which needs runs on main.
+RS-02: demo machine = Yash's MacBook (macOS, Darwin 27.3) — §5.2 rule: if either teammate has a Mac, the demo machine is a Mac, Yash's if he has one.
+RS-02: Switch Console 0.40.1 installed on the demo machine (from the app's Info.plist); Claude Code 2.1.304 installed.
