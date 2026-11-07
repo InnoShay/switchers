@@ -255,7 +255,7 @@ async def test_exec_frozen_refused_and_too_long(desk):  # noqa: F811
     await say(desk, "@hands freeze")
     await say(desk, "@hands exec ls")
     await desk.drain()
-    assert "⛔ refused · frozen by owner" in posts(desk)
+    assert "⛔ refused · paused by owner" in posts(desk)
     await say(desk, "@hands unfreeze")
     await say(desk, "@hands exec " + "x" * 301)
     await desk.drain()

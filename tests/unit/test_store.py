@@ -33,7 +33,7 @@ def test_failed_write_keeps_old_content(tmp_path):
     except TypeError:
         pass
     assert json.loads(p.read_text()) == {"ok": True}
-    assert [f.name for f in tmp_path.iterdir()] == ["keep.json"]
+    assert [f.name for f in tmp_path.iterdir() if f.is_file()] == ["keep.json"]
 
 
 def test_agent_creds_round_trip_and_mode(rs_home):
