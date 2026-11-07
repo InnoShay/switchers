@@ -324,12 +324,22 @@ def up(
 
 
 @app.command()
-def backup(dry_run: bool = typer.Option(False, "--dry-run", help="Fake OS actions")) -> None:
-    """Run the backup desk (desk-backup, no life/scheduler); takes `hands` on handoff (SPEC §15)."""
+def backup(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Fake OS actions"),
+    no_hud: bool = typer.Option(False, "--no-hud", help="Do not start the HUD"),
+) -> None:
+    """Run the backup desk (desk-backup, no life/scheduler); takes `hands` on handoff (SPEC §15).
+
+    Starts its own HUD (HUD_PORT) so HANDS TRANSFERRED shows on this machine.
+
+    Demo on one Mac: terminal 1 `roomservice up`; terminal 2
+    `ROOMSERVICE_AGENT=desk-backup ROOMSERVICE_DESK_CONFIG=config/desk.backup.yaml
+    HUD_PORT=7778 roomservice backup`; then kill terminal 1.
+    """
     from roomservice.agents.backup import run_backup
 
     try:
-        asyncio.run(run_backup(dry_run))
+        asyncio.run(run_backup(dry_run, no_hud))
     except KeyboardInterrupt:
         console.print("bye")
 

@@ -186,3 +186,54 @@ async def test_explicit_mode_only_moves_on_release(fixtures_dir, monkeypatch, tm
         await laptop.stop()
         await backup.stop()
         await fake.stop()
+
+
+async def test_handoff_reaches_hud_ws_stream(fixtures_dir, monkeypatch, tmp_path):
+    """The backup's `transfer` and `system` events reach a client of the HUD /ws stream."""
+    import json
+    import socket
+
+    import websockets
+
+    from roomservice.bus import bus
+    from roomservice.hud.server import run_hud
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    fake, laptop, backup = await start_pair(
+        fixtures_dir, monkeypatch, tmp_path, "lease", lease_ttl=0.6
+    )
+    backup.bus = bus  # the module-level bus the HUD serves, as in `roomservice backup`
+    hud = asyncio.create_task(run_hud(port))
+    seen: list[dict] = []
+    try:
+        ws = None
+        for _ in range(100):
+            try:
+                ws = await websockets.connect(f"ws://127.0.0.1:{port}/ws")
+                break
+            except OSError:
+                await asyncio.sleep(0.05)
+        assert ws is not None
+        assert json.loads(await ws.recv())["type"] == "hello"
+        await backup.start()
+        await laptop.stop()
+        end = time.monotonic() + 10
+
+        def done():
+            kinds = {m["type"] for m in seen}
+            return "transfer" in kinds and any(
+                m["type"] == "system" and "desk-backup" in m["text"] for m in seen
+            )
+
+        while time.monotonic() < end and not done():
+            seen.append(json.loads(await asyncio.wait_for(ws.recv(), 10)))
+        transfer = next(m for m in seen if m["type"] == "transfer")
+        assert transfer["to_agent"] == "desk-backup"
+        assert any(m["type"] == "system" and "desk-backup" in m["text"] for m in seen)
+        await ws.close()
+    finally:
+        hud.cancel()
+        await backup.stop()
+        await fake.stop()

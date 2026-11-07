@@ -8,7 +8,7 @@ from typing import Any
 
 from roomservice.agents.desk import DeskAgent, hands_holder
 from roomservice.contracts.agent import RoomInfo, RoomKind
-from roomservice.contracts.events import TransferEvent
+from roomservice.contracts.events import SystemEvent, TransferEvent
 from roomservice.contracts.switch import MessagePayload, OpError
 from roomservice.desk import receipts
 from roomservice.log import get_logger
@@ -105,11 +105,12 @@ class BackupAgent(DeskAgent):
         for r in targets:
             await self._safe_reply(r, text)
         self.bus.publish(TransferEvent(from_agent=previous or "desk-laptop", to_agent=self.name))
+        self.bus.publish(SystemEvent(level="info", text=f"hands transferred to {self.name}"))
         self.actions.speak("Hands transferred to backup.")
         log.info("hands is now on %s (mission %s)", self.name, room.name)
 
 
-async def run_backup(dry_run: bool = False) -> None:
+async def run_backup(dry_run: bool = False, no_hud: bool = False) -> None:
     """`roomservice backup`: start the backup desk and idle until cancelled."""
     from roomservice.cli import _load_cfg, _status_table, console
     from roomservice.contracts.config import load_settings
@@ -120,11 +121,23 @@ async def run_backup(dry_run: bool = False) -> None:
     dry = dry_run or settings.roomservice_dry_run
     agent = BackupAgent(cfg=_load_cfg(settings), settings=settings, dry_run=dry)
     await agent.start()
+    hud_task: asyncio.Task | None = None
+    if not no_hud:
+        try:
+            from roomservice.cli import _open_hud
+            from roomservice.hud.server import run_hud
+
+            hud_task = asyncio.create_task(run_hud(settings.hud_port), name="backup-hud")
+            _open_hud(settings.hud_port)
+        except Exception as e:
+            console.print(f"[yellow]HUD failed to start: {e}[/yellow]")
     console.print(f"[green]backup up[/green] as {agent.name}{' (dry run)' if dry else ''}")
     try:
         while True:
             await asyncio.sleep(60)
             _status_table(agent)
     finally:
+        if hud_task is not None:
+            hud_task.cancel()
         with contextlib.suppress(Exception):
             await agent.stop()
