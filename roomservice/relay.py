@@ -10,8 +10,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from roomservice.agents.base import resolve_agent_key
+from roomservice.bus import Bus
 from roomservice.contracts.agent import RoomInfo, RoomKind
 from roomservice.contracts.config import Settings
+from roomservice.contracts.events import SystemEvent
 from roomservice.contracts.switch import MessagePayload
 from roomservice.desk.approvals import Approval, Approvals
 from roomservice.log import get_logger
@@ -23,6 +25,7 @@ PLAN_BODY_LINES = MAX_LINES - 1  # header line + 5 body lines
 RATE_LIMIT = 6  # mirrors / minute / mission
 WINDOW_S = 60.0
 SUMMARY_MAX = 100
+GLOBAL_MAX = 30  # RS-10 safety valve: mirrors / 60 s across all missions, then stop
 
 # -- detectors (easy to swap once tests/fixtures/permission_request.json exists, S5) -----------
 
@@ -43,6 +46,31 @@ def permission_summary(body: str) -> str:
         if line and not PERMISSION_RE.search(line):
             return line[:SUMMARY_MAX]
     return "permission request"
+
+
+# -- RS-10: loop guards -----------------------------------------------------------------------
+
+AUTO_REPLY_MARKERS = ("com.switch.auto_reply", "com.switch.admin")
+OFFLINE_RE = re.compile(r"I'm currently offline", re.IGNORECASE)
+_MENTION_AT_RE = re.compile(r"@(?=[\w-])")
+
+
+def is_machine_message(msg: MessagePayload, raw: dict | None = None) -> bool:
+    """Switch auto-reply/admin voice or any desk-* agent: never a command, never mirrored.
+
+    The marker may sit in the payload dict (`raw`); the body prefix and the sender name are the
+    fallbacks. Our own relay output never reaches this check (self-messages are dropped first).
+    """
+    if raw and any(raw.get(k) for k in AUTO_REPLY_MARKERS):
+        return True
+    if OFFLINE_RE.search(msg.body[:120]):
+        return True
+    return msg.sender_name.casefold().startswith("desk-")
+
+
+def neutralise(text: str) -> str:
+    """Full-width `＠` for every mention so a mirror can never address an agent."""
+    return _MENTION_AT_RE.sub("＠", text)
 
 
 # -- text helpers -------------------------------------------------------------------------
@@ -89,6 +117,7 @@ class Relay:
         upload: Callable[[str, bytes, str, str], Awaitable[object]],
         reply: Callable[[RoomInfo, str, str | None], Awaitable[None]],
         clock: Callable[[], float] | None = None,
+        bus: Bus | None = None,
     ) -> None:
         self.settings = settings
         self.approvals = approvals
@@ -98,6 +127,9 @@ class Relay:
         self._reply = reply
         self._clock = clock or (lambda: time.time())  # late-bound so freezegun works
         self._state: dict[str, _MissionState] = {}
+        self._bus = bus
+        self._all_sent: deque[float] = deque()  # every mirror, all missions (safety valve)
+        self._tripped_at: float | None = None
 
     # -- inbound from the mission room -------------------------------------------------------
 
@@ -105,9 +137,18 @@ class Relay:
         """Should the desk receive this (unaddressed) message? Any mission-room chatter."""
         return room.kind == RoomKind.MISSION
 
-    async def observe(self, room: RoomInfo, msg: MessagePayload, *, is_owner: bool = False) -> None:
+    async def observe(
+        self,
+        room: RoomInfo,
+        msg: MessagePayload,
+        *,
+        is_owner: bool = False,
+        raw: dict | None = None,
+    ) -> None:
         """Apply the §13.2 rules to a message someone else posted in a mission room."""
-        if room.kind != RoomKind.MISSION or is_owner:
+        if room.kind != RoomKind.MISSION or is_owner:  # never mirror what started in HQ
+            return
+        if is_machine_message(msg, raw):  # RS-10: auto-replies and desk-* chatter
             return
         try:
             await self._observe(room, msg)
@@ -182,7 +223,11 @@ class Relay:
     async def _send_hq(
         self, text: str | None, png: bytes | None = None, filename: str = "", caption: str = ""
     ) -> None:
+        text = neutralise(text) if text else text
+        caption = neutralise(caption)
         for hq in self._hq_rooms():
+            if hq.kind != RoomKind.HQ:  # defensive: only HQ rooms are mirror targets
+                continue
             try:
                 if png is not None:
                     await self._upload(hq.id, png, filename, caption)
@@ -201,6 +246,8 @@ class Relay:
         caption: str = "",
     ) -> None:
         now = self._clock()
+        if self._valve_open(now):
+            return
         st = self._st(room)
         await self._flush(room.name, st, now)
         while st.sent and now - st.sent[0] >= WINDOW_S:
@@ -211,7 +258,26 @@ class Relay:
             st.suppressed += 1
             return
         st.sent.append(now)
+        self._all_sent.append(now)
         await self._send_hq(text, png, filename, clip(caption))
+
+    def _valve_open(self, now: float) -> bool:
+        """RS-10 safety valve: True while mirroring is stopped (> GLOBAL_MAX mirrors in 60 s)."""
+        if self._tripped_at is not None:
+            if now - self._tripped_at < WINDOW_S:
+                return True
+            self._tripped_at = None
+            self._all_sent.clear()
+        while self._all_sent and now - self._all_sent[0] >= WINDOW_S:
+            self._all_sent.popleft()
+        if len(self._all_sent) > GLOBAL_MAX:
+            self._tripped_at = now
+            text = f"relay stopped: {len(self._all_sent)} mirrors in {int(WINDOW_S)}s (loop?)"
+            log.warning(text)
+            if self._bus is not None:
+                self._bus.publish(SystemEvent(level="warn", text=text))
+            return True
+        return False
 
     async def _flush(self, name: str, st: _MissionState, now: float) -> None:
         if (

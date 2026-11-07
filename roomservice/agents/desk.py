@@ -40,7 +40,7 @@ from roomservice.desk.grammar import Command, ParseError, parse_message
 from roomservice.desk.ignition import Ignition
 from roomservice.desk.state import StateManager
 from roomservice.log import get_logger
-from roomservice.relay import BuilderAsk, Relay  # RS-10
+from roomservice.relay import BuilderAsk, Relay, is_machine_message  # RS-10
 from roomservice.voice import SpeechQueue
 
 log = get_logger("desk")
@@ -199,6 +199,7 @@ class DeskAgent(BaseProtocolAgent):
             post=lambda room_id, text: self.http.post(room_id, text),
             upload=lambda rid, png, fn, cap: self.http.upload(rid, [(fn, png, "image/png")], cap),
             reply=lambda room, text, thread: self._safe_reply(room, text, thread),
+            bus=bus,
         )
 
     def _mark_ignited(self) -> None:
@@ -318,7 +319,9 @@ class DeskAgent(BaseProtocolAgent):
     async def on_message(self, room: RoomInfo, ev: DomainEvent, msg: MessagePayload) -> None:
         self._rooms_seen[room.id] = room
         owner = msg.sender in owner_ids()
-        await self.relay.observe(room, msg, is_owner=owner)  # RS-10
+        if is_machine_message(msg, ev.payload):  # RS-10: never answer auto-replies / desk-* peers
+            return
+        await self.relay.observe(room, msg, is_owner=owner, raw=ev.payload)  # RS-10
         if self.ignition.matches(room, msg):
             await self.ignition.fire(room, msg)
         if owner and (parsed := parse_resolution(msg.body)) is not None:
