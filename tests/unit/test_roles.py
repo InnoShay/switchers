@@ -66,7 +66,7 @@ async def test_mission_releases_old_role_then_assumes_new(desk):  # noqa: F811
     assert names == ["assume_role", "release_role", "assume_role"]
     assert desk.role_room.id == "m2"
     joined = " ".join(posts(desk))
-    assert "✅ mission two-b" in joined and "auto-wrapped one-a" in joined
+    assert "✅ task two-b" in joined and "auto-wrapped one-a" in joined
     saved = json.loads((store.state_dir() / "one-a.json").read_text())
     assert saved["slug"] == "one-a"
     assert not any(p.startswith("✅ wrap") for p in posts(desk))  # silent auto-wrap
@@ -85,7 +85,7 @@ async def test_mission_refused_when_hands_held_elsewhere(desk):  # noqa: F811
 
     http.op = op
     await in_room(desk, M1, "@hands mission one-a none")
-    assert posts(desk)[-1] == "⛔ refused · hands is held by desk-backup"
+    assert posts(desk)[-1] == "⛔ refused · the computer is busy with desk-backup"
     assert desk.role_room is None and desk.state.active is None
 
 

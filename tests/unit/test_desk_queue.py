@@ -119,17 +119,17 @@ async def test_rate_limit(desk):
 async def test_freeze_and_unfreeze(desk):
     await say(desk, "@hands freeze")
     assert desk.frozen
-    assert posts(desk)[-1] == "🧊 frozen by owner"
+    assert posts(desk)[-1] == "🧊 paused by owner"
     await say(desk, "@hands open browser")
-    assert posts(desk)[-1] == "⛔ refused · frozen by owner"
+    assert posts(desk)[-1] == "⛔ refused · paused by owner"
     await say(desk, "@hands status")
     await say(desk, "@hands help")
     await desk.drain()
-    assert any(x.startswith("✅ status") and "frozen yes" in x for x in posts(desk))
+    assert any(x.startswith("✅ status") and "paused yes" in x for x in posts(desk))
     assert any(x.startswith("@hands <verb>") or "boot <project>" in x for x in posts(desk))
     await say(desk, "@hands unfreeze")
     assert not desk.frozen
-    assert posts(desk)[-1] == "🔥 unfrozen by owner"
+    assert posts(desk)[-1] == "▶ resumed by owner"
     await say(desk, "@hands open browser")
     await desk.drain()
     assert posts(desk)[-1].startswith("✅ open browser")
@@ -152,7 +152,7 @@ async def test_queued_jobs_are_refused_when_frozen_before_they_run(desk):
     await say(desk, "@hands open browser\n@hands say hi")
     await desk.set_frozen(True, "owner")
     await desk.drain()
-    assert "⛔ refused · frozen by owner" in posts(desk)
+    assert "⛔ refused · paused by owner" in posts(desk)
 
 
 async def test_too_many_commands_and_didnt_understand(desk):
@@ -161,7 +161,7 @@ async def test_too_many_commands_and_didnt_understand(desk):
     await desk.drain()
     p = posts(desk)
     assert "⛔ refused · more than 5 commands in one message" in p
-    assert '⛔ didn\'t understand · "dance" · try: @hands help' in p
+    assert '⛔ didn\'t understand · "dance" · try: @computer help' in p
 
 
 async def test_commit_asks_for_approval_then_owner_ok_runs_it(desk, tmp_path):

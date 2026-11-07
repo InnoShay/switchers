@@ -63,7 +63,7 @@ async def test_boot_status_help_freeze_flow(fixtures_dir, monkeypatch, tmp_path)
     )
     try:
         await agent.start()
-        await wait_for(lambda: any(b.startswith("✅ mission") for b in bodies(fake)))
+        await wait_for(lambda: any(b.startswith("✅ task") for b in bodies(fake)))
         got = bodies(fake)
 
         boot = next(i for i, b in enumerate(got) if b.startswith("✅ boot volt"))
@@ -72,12 +72,12 @@ async def test_boot_status_help_freeze_flow(fixtures_dir, monkeypatch, tmp_path)
         )
         order = [
             next(i for i, b in enumerate(got) if b.startswith(p))
-            for p in ("✅ boot", "✅ status", "🧊 frozen by owner", "⛔ refused · frozen by owner")
+            for p in ("✅ boot", "✅ status", "🧊 paused by owner", "⛔ refused · paused by owner")
         ]
         assert order == sorted(order)
         assert any("boot <project>" in b for b in got)  # help
-        assert "🔥 unfrozen by owner" in got
-        assert "✅ mission volt-waitlist · already booted · hands assumed" in got
+        assert "▶ resumed by owner" in got
+        assert "✅ task volt-waitlist · already booted · computer assumed" in got
 
         # mission: assume_role(hands) bound to the room connection
         assume = fake.calls_named("op:assume_role")

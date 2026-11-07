@@ -123,7 +123,7 @@ async def test_restart_mid_mission_keeps_the_mission(rig):
     start_fake, make_desk = rig
     first = await start_fake([[message_frame(1, "@hands mission volt-waitlist volt")]])
     agent, adapter = await make_desk(first)
-    await wait_for(lambda: any(b.startswith("✅ mission") for b in bodies(first)))
+    await wait_for(lambda: any(b.startswith("✅ task") for b in bodies(first)))
     boot_opens = count(adapter, "open_url")
 
     await first.stop()
@@ -132,7 +132,7 @@ async def test_restart_mid_mission_keeps_the_mission(rig):
     await wait_for(lambda: bool(second.ws_opens), timeout=25)
     await asyncio.sleep(0.5)
     # the replayed mission command is not run again (cursor says seq 1 was handled)
-    assert not any(b.startswith("✅ mission") for b in bodies(second))
+    assert not any(b.startswith("✅ task") for b in bodies(second))
     assert count(adapter, "open_url") == boot_opens
     assert agent.state.active and agent.state.active.slug == "volt-waitlist"
 

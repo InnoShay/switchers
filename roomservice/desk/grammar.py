@@ -6,7 +6,9 @@ import re
 import shlex
 from dataclasses import dataclass, field
 
-MENTION_RE = re.compile(r"^@(?:hands|desk-laptop|desk-backup)[,:]?\s+(?P<cmd>.+)$", re.IGNORECASE)
+MENTION_RE = re.compile(
+    r"^@(?:hands|computer|backup|desk-laptop|desk-backup)[,:]?\s+(?P<cmd>.+)$", re.IGNORECASE
+)
 _MENTION_TOKEN_RE = re.compile(r"@\S+")
 
 ALIASES: dict[str, str] = {
@@ -17,6 +19,10 @@ ALIASES: dict[str, str] = {
     "speak": "say",
     "start": "boot",
     "goodnight": "wrap",
+    "task": "mission",
+    "pause": "freeze",
+    "unpause": "unfreeze",
+    "wake": "boot",
     "stop": "freeze",
     "halt": "freeze",
     "approve": "ok",
