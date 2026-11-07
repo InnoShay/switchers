@@ -18,7 +18,12 @@ from roomservice.agents.base import CREW_KEYS, BaseProtocolAgent, owner_ids, res
 from roomservice.bus import bus as default_bus
 from roomservice.contracts.agent import RoomInfo, RoomKind
 from roomservice.contracts.config import DeskConfig, Settings, load_settings
-from roomservice.contracts.events import ActionEndEvent, ActionStartEvent, FreezeEvent
+from roomservice.contracts.events import (
+    ActionEndEvent,
+    ActionStartEvent,
+    FreezeEvent,
+    SystemEvent,
+)
 from roomservice.contracts.os import OSAdapter
 from roomservice.contracts.switch import DomainEvent, MessagePayload, OpError
 from roomservice.desk import receipts
@@ -46,6 +51,9 @@ PAIR_TTL_S = 600
 PAIR_MAX_FAILS = 5
 SWEEP_EVERY_S = 5.0
 PARTICIPANT_TTL_S = 30.0
+LEASE_RENEW_S = 3.0  # SPEC §15: renew_lease every 3 s while holding `hands`
+LEASE_MAX_FAILS = 3  # consecutive failures = role lost
+HOLDER_KEYS = ("holder", "held_by", "holder_name", "agent_name", "agent", "assigned_to")
 
 
 # -- pairing files (SPEC §9.5) ----------------------------------------------------------
@@ -77,6 +85,21 @@ def add_owner(sender: str, sender_name: str, room_name: str) -> None:
     ]
     owners.append({"sender": sender, "sender_name": sender_name, "room_name": room_name})
     store.write_json(store.owners_path(), owners, secret=True)
+
+
+def hands_holder(res: Any) -> str | None:
+    """Who holds `hands` according to a tolerant parse of a list_roles result (None = unheld)."""
+    roles = res.get("roles", res) if isinstance(res, dict) else res
+    if isinstance(roles, dict):  # {"hands": {...}} or {"hands": "holder"}
+        roles = [{"name": k, **v} if isinstance(v, dict) else {"name": k, "holder": v}
+                 for k, v in roles.items()]  # fmt: skip
+    for r in roles if isinstance(roles, list) else []:
+        if isinstance(r, dict) and r.get("name") == "hands":
+            for k in HOLDER_KEYS:
+                if r.get(k):
+                    v = r[k]
+                    return str(v.get("name") or v.get("id")) if isinstance(v, dict) else str(v)
+    return None
 
 
 # -- jobs -------------------------------------------------------------------------------
@@ -130,6 +153,7 @@ class DeskAgent(BaseProtocolAgent):
         self.current: Job | None = None
         self.queue: asyncio.Queue[Job] = asyncio.Queue()
         self.role_room: RoomInfo | None = None
+        self.lease_every_s = LEASE_RENEW_S
         self.last_error: str | None = None
         self._started = time.monotonic()
         self._recent: deque[float] = deque()
@@ -206,8 +230,38 @@ class DeskAgent(BaseProtocolAgent):
         await super().stop()
 
     def start_lease_renewal(self) -> None:
-        """RS-12 stub: renew_lease(conn) every 3 s while holding `hands`; 3 consecutive failures
-        = role lost (HUD warn). Intentionally empty in RS-07."""
+        """Renew the lease on the `hands` connection every 3 s while holding the role; three
+        consecutive failures = role lost (HUD warn). Stopped by `stop()` (task cancel)."""
+        self._tasks.append(asyncio.create_task(self._lease_loop(), name="desk-lease"))
+
+    async def _lease_loop(self) -> None:
+        fails = 0
+        while True:
+            await asyncio.sleep(self.lease_every_s)
+            room = self.role_room
+            if room is None or not room.conn_id:
+                fails = 0
+                continue
+            conn = self.watcher.connections.get(room.id) if self.watcher else None
+            if conn is not None and conn.role_lost:  # `room_released` frame already warned
+                self.role_room = None
+                fails = 0
+                continue
+            try:
+                ok = await self.http.renew_lease(room.conn_id)
+            except Exception as e:
+                log.warning("renew_lease failed: %s", e)
+                ok = False
+            fails = 0 if ok else fails + 1
+            if fails >= LEASE_MAX_FAILS and self.role_room is room:
+                self.role_room = None
+                fails = 0
+                log.warning("hands lease lost (%d failed renewals)", LEASE_MAX_FAILS)
+                self.bus.publish(
+                    SystemEvent(
+                        level="warn", text=f"hands role lost (lease not renewed): {room.name}"
+                    )
+                )
 
     # -- roles --------------------------------------------------------------------------
 
@@ -230,14 +284,19 @@ class DeskAgent(BaseProtocolAgent):
                 return False, await self._role_holder(room)
             raise
         self.role_room = room
+        if self.watcher and (conn := self.watcher.connections.get(room.id)):
+            conn.role_lost = False
         return True, None
 
     async def release_hands(self) -> bool:
         room = self.role_room
         if room is None or not room.conn_id:
             return False
-        await self.http.op("release_role", {}, room.conn_id)
         self.role_room = None
+        try:
+            await self.http.op("release_role", {}, room.conn_id)
+        except OpError as e:
+            log.warning("release_role failed: %s", e)
         return True
 
     async def _role_holder(self, room: RoomInfo) -> str | None:
@@ -245,13 +304,7 @@ class DeskAgent(BaseProtocolAgent):
             res = await self.http.op("list_roles", {}, room.conn_id)
         except OpError:
             return None
-        roles = res.get("roles", res) if isinstance(res, dict) else res
-        for r in roles if isinstance(roles, list) else []:
-            if isinstance(r, dict) and r.get("name") == "hands":
-                for k in ("holder", "held_by", "agent", "holder_name", "assigned_to"):
-                    if r.get(k):
-                        return str(r[k])
-        return None
+        return hands_holder(res)
 
     # -- inbound ------------------------------------------------------------------------
 
@@ -393,7 +446,7 @@ class DeskAgent(BaseProtocolAgent):
     def _receipt(job: Job, res: ActionResult, secs: float) -> str | None:
         cmd = job.cmd
         if not res.ok:
-            return receipts.refused(cmd.raw, res.reason)
+            return res.text or receipts.refused(cmd.raw, res.reason)
         if res.silent:
             return None
         if res.text is not None:

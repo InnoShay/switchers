@@ -41,6 +41,11 @@ def refused(raw: str, reason: str) -> str:
     return f"⛔ refused · {raw} — {reason}"
 
 
+def refused_held(holder: str) -> str:
+    """§15: `mission` while another agent holds the exclusive `hands` role."""
+    return f"⛔ refused · hands is held by {holder}"
+
+
 def refused_rate_limit(limit: int = 20) -> str:
     return f"⛔ refused · rate limit ({limit}/min)"
 
